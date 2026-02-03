@@ -24,6 +24,8 @@ const login = async (req, res) => {
                 id: true,
                 name: true,
                 email: true,
+                phone: true,
+                profileImage: true,
                 password: true
             }
         })
@@ -49,7 +51,7 @@ const login = async (req, res) => {
 
         const token = jwt.sign({
             id: user.id
-        }, process.env.JWT_SECRET, {expiresIn: '1h'})
+        }, process.env.JWT_SECRET, {expiresIn: '7d'})
 
         const {password, ...userWithoutPassword} = user
 
@@ -62,6 +64,7 @@ const login = async (req, res) => {
             }
         })
     } catch (error) {
+        console.error("Login error:", error);
         res.status(500).send({
             success: false,
             message: "Internal server error",

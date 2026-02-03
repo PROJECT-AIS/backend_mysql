@@ -8,13 +8,14 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String?  @db.VarChar(255)
-  email     String   @unique(map: "email") @db.VarChar(255)
-  phone     String?  @db.VarChar(20)
-  password  String?  @db.VarChar(255)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           Int      @id @default(autoincrement())
+  name         String?  @db.VarChar(255)
+  email        String   @unique(map: "email") @db.VarChar(255)
+  phone        String?  @db.VarChar(20)
+  password     String?  @db.VarChar(255)
+  profileImage String?  @db.VarChar(500) @map("profile_image")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@map("users")
 }
