@@ -13,8 +13,9 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }))
-app.use(bodyParser.urlencoded({extended: false}))
-app.use(bodyParser.json())
+
+app.use(express.json())
+app.use(express.urlencoded({ extended: true }))
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads')
@@ -26,6 +27,11 @@ if (!fs.existsSync(uploadsDir)) {
 app.use('/uploads', express.static(uploadsDir))
 
 const port = 6969;
+
+app.use((req, res, next) => {
+    console.log(`[REQUEST] ${req.method} ${req.originalUrl}`);
+    next();
+});
 
 app.get('/', (req, res) => {
     res.send("Hello World!")
