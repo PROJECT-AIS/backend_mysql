@@ -1,0 +1,26 @@
+const { body } = require('express-validator')
+const prisma = require('../../prisma/client')
+
+const validateRegister = [
+    body('name').notEmpty().withMessage('Name is required'),
+    body('email').notEmpty().withMessage('Email is required').isEmail().withMessage('Email is invalid').custom(async (value) => {
+        if(!value) {
+            throw new Error('Email is required')
+        }
+        const user = await prisma.user.findUnique({where: {email: value}})
+        if(user) {
+            throw new Error("Email already exists");
+        }
+        return true;
+    }),
+    body('phone').notEmpty().withMessage('Phone is required'),
+    body('password').isLength({min: 6}).withMessage('Password must be at least 6 characters long'),
+]
+
+const validateLogin = [
+    // Hanya validasi email dan password
+    body('email').notEmpty().withMessage('Email is required').isEmail().withMessage('Email is invalid'),
+    body('password').notEmpty().withMessage('Password is required')
+];
+
+module.exports = { validateLogin, validateRegister };
