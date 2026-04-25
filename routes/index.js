@@ -165,6 +165,14 @@ router.post('/esp/lokasi', configController.createLokasi);
 router.put('/esp/lokasi/:id', configController.updateLokasi);
 router.delete('/esp/lokasi/:id', configController.deleteLokasi);
 
+//Versi Publik nya Material Type
+// Material Type
+router.get('/esp/material-type', configController.getAllMaterialType);
+router.get('/esp/material-type/:id', configController.getMaterialTypeById);
+router.post('/esp/material-type', configController.createMaterialType);
+router.put('/esp/material-type/:id', configController.updateMaterialType);
+router.delete('/esp/material-type/:id', configController.deleteMaterialType);
+
 // =======================================================
 // RUTE EVENT & UPLOAD
 // =======================================================

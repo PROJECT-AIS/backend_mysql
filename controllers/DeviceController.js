@@ -1,6 +1,5 @@
 // express-backend/controllers/DeviceController.js
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../prisma/client');
 const mqtt = require('mqtt');
 
 const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt.aispektra.com:443';

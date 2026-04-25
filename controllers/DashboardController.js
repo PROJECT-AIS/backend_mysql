@@ -1,17 +1,22 @@
 const { InfluxDB } = require('@influxdata/influxdb-client');
 const { getInfluxConfig } = require('../db/influxConfig');
 
-const {
-  url: influxUrl,
-  token: influxToken,
-  org: influxOrg,
-  bucket: influxBucket,
-} = getInfluxConfig();
+let cachedQueryApi = null;
+let cachedQueryKey = '';
 
-const influx = new InfluxDB({ url: influxUrl, token: influxToken });
-const queryApi = influx.getQueryApi(influxOrg);
+const getInfluxQueryContext = () => {
+  const config = getInfluxConfig();
+  const queryKey = `${config.url}|${config.token}|${config.org}|${config.bucket}`;
 
-const TZ_OFFSET_MIN = parseInt(process.env.APP_TZ_OFFSET_MIN || '420', 10);
+  if (!cachedQueryApi || cachedQueryKey !== queryKey) {
+    cachedQueryApi = new InfluxDB({ url: config.url, token: config.token }).getQueryApi(config.org);
+    cachedQueryKey = queryKey;
+  }
+
+  return { config, queryApi: cachedQueryApi };
+};
+
+const TZ_OFFSET_MIN = parseInt(process.env.APP_TZ_OFFSET_MIN || '480', 10);
 
 const pad = (n) => String(n).padStart(2, '0');
 function toTZISO(date, offsetMin) {
@@ -31,9 +36,11 @@ function toTZISO(date, offsetMin) {
 }
 
 const getSummary = async (req, res) => {
+  const { config, queryApi } = getInfluxQueryContext();
+
   try {
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: -7d)
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> filter(fn: (r) => r._field == "unit_state_code" or r._field == "cons_l_total")
@@ -85,9 +92,11 @@ const getSummary = async (req, res) => {
 };
 
 const getVehicles = async (req, res) => {
+  const { config, queryApi } = getInfluxQueryContext();
+
   try {
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: -24h)
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> group(columns: ["vehicle_id", "_field"])
@@ -120,18 +129,21 @@ const getVehicles = async (req, res) => {
 
 const getFuelRealtime = async (req, res) => {
   const { vehicleId } = req.params;
+  const { config, queryApi } = getInfluxQueryContext();
+
   try {
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: -24h)
-        |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${vehicleId}")
-        |> filter(fn: (r) => r._field == "fuel_vol_l")
-        |> aggregateWindow(every: 1h, fn: mean, createEmpty: false)
-        |> yield(name: "mean")
+        |> filter(fn: (r) => r.vehicle_id == "${vehicleId}" and r._field == "fuel_vol_l")
+        |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+        |> sort(columns: ["_time"], desc: true)
+        |> limit(n: 10)
     `;
 
     const rows = await queryApi.collectRows(flux);
-    const data = rows.map(r => ({
+    // Reverse so chart goes left (oldest) to right (newest)
+    const data = rows.reverse().map(r => ({
       time: toTZISO(new Date(r._time), TZ_OFFSET_MIN).split('T')[1].substring(0, 5),
       value: Number(Number(r._value).toFixed(2))
     }));
@@ -144,13 +156,15 @@ const getFuelRealtime = async (req, res) => {
 
 const getFuelWeekly = async (req, res) => {
   const { vehicleId } = req.params;
+  const { config, queryApi } = getInfluxQueryContext();
+
   try {
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: -7d)
-        |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${vehicleId}")
-        |> filter(fn: (r) => r._field == "cons_l_total")
-        |> aggregateWindow(every: 1d, fn: spread, createEmpty: false)
+        |> filter(fn: (r) => r.vehicle_id == "${vehicleId}" and r._field == "fuel_vol_l")
+        |> aggregateWindow(every: 1d, fn: mean, createEmpty: false)
+        |> yield(name: "mean")
     `;
 
     const rows = await queryApi.collectRows(flux);
@@ -174,74 +188,88 @@ const getHistory = async (req, res) => {
   const start = from ? from : '-365d';
   const stop = to ? to : 'now()';
 
+  const { config, queryApi } = getInfluxQueryContext();
+  if (!config.token || !config.org) {
+    return res.status(500).json({ error: 'InfluxDB Org/Token not configured' });
+  }
+
   try {
     let filterVehicle = '';
-    if (vehicle_id) {
+    if (vehicle_id && vehicle_id !== '') {
       filterVehicle = `|> filter(fn: (r) => r.vehicle_id == "${vehicle_id}")`;
     }
 
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: ${start}, stop: ${stop})
-        |> filter(fn: (r) => r._measurement == "telemetry")
+        |> filter(fn: (r) => r._field == "lat" or r._field == "lon" or r._field == "spd_kph" or r._field == "unit_state_code" or r._field == "fuel_vol_l" or r._field == "cons_l_total")
         ${filterVehicle}
-        |> pivot(rowKey:["_time", "vehicle_id"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: true)
-        |> limit(n: ${limit}, offset: ${(page - 1) * limit})
+        |> limit(n: ${limit * 10}) 
+        |> pivot(rowKey:["_time", "device_id"], columnKey: ["_field"], valueColumn: "_value")
+        |> limit(n: ${limit})
     `;
 
-    const countFlux = `
-      from(bucket: "${influxBucket}")
-        |> range(start: ${start}, stop: ${stop})
-        |> filter(fn: (r) => r._measurement == "telemetry")
-        ${filterVehicle}
-        |> group(columns: ["vehicle_id"])
-        |> count()
-        |> group()
-        |> sum()
-    `;
-
-    const [rows, countRows] = await Promise.all([
-      queryApi.collectRows(flux),
-      queryApi.collectRows(countFlux)
-    ]);
-    
-    const total = countRows.length > 0 ? countRows[0]._value : 0;
+    const rows = await queryApi.collectRows(flux);
+    const total = rows.length; // Temporary total
 
     const formatted = rows.map((r, i) => ({
       seq: (page - 1) * limit + i + 1,
       waktu: toTZISO(new Date(r._time), TZ_OFFSET_MIN).replace('T', ' ').split('.')[0],
-      idAlat: r.device_id,
-      unitKendaraan: r.vehicle_id,
+      idAlat: r.device_id || "-",
+      unitKendaraan: r.vehicle_id || "-",
       kecepatanKendaraan: Number(r.spd_kph || 0),
+      jenisMuatan: r.payload_type || "-",
+      statusMuatan: r.payload_status || "-",
       statusUnit: {
+        start: r.start_time || "-",
+        rentangWaktuAktif: r.active_range || "-",
+        totalDurasiAktif: r.active_duration || "-",
+        rentangWaktuPasif: r.passive_range || "-",
+        totalWaktuPasif: r.passive_duration || "-",
         mati: Number(r.unit_state_code) === 0 ? "Ya" : "Tidak"
       },
+      operator: {
+        nama: r.operator_name || "-",
+        id: r.operator_id || "-",
+        jabatan: r.operator_role || "-",
+        divisi: r.operator_division || "-"
+      },
       gps: {
-        latitude: Number(r.lat),
-        longitude: Number(r.lon),
-        trip: r.trip_id
+        latitude: Number(r.lat || 0),
+        longitude: Number(r.lon || 0),
+        trip: r.trip_id || "-"
       },
       sensorFuel: {
         volumeBahanBakar: Number(r.fuel_vol_l || 0),
         konsumsi: Number(r.cons_l_total || 0),
-        anomaliStatus: String(r.fuel_anomaly) === "true" ? "Terdeteksi" : "Normal"
+        anomaliStatus: String(r.fuel_anomaly) === "true" ? "Terdeteksi" : "Normal",
+        bahanBakarMasuk: Number(r.fuel_in || 0)
+      },
+      lokasi: {
+        awal: r.loc_start || "-",
+        akhir: r.loc_end || "-"
+      },
+      retase: {
+        setUlangRetase: r.retase_reset || "-"
       }
     }));
 
-    res.json({
+    return res.status(200).json({
       data: formatted,
       total: total,
       page: Number(page),
       limit: Number(limit)
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("History Error:", err);
+    return res.status(500).json({ error: err.message, stack: err.stack });
   }
 };
 
 const getStatistics = async (req, res) => {
   const { period = 'realtime' } = req.query;
+  const { config, queryApi } = getInfluxQueryContext();
   let range = '-24h';
   let window = '1h';
 
@@ -255,7 +283,7 @@ const getStatistics = async (req, res) => {
 
   try {
     const flux = `
-      from(bucket: "${influxBucket}")
+      from(bucket: "${config.bucket}")
         |> range(start: ${range})
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> filter(fn: (r) => r._field == "cons_l_total" or r._field == "unit_state_code")

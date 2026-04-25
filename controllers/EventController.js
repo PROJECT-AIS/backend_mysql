@@ -1,7 +1,6 @@
 // Lokasi: express-backend/controllers/EventController.js
 
-const { PrismaClient } = require('@prisma/client');
-const prisma = new PrismaClient();
+const prisma = require('../prisma/client');
 const influxWriteApi = require('../db/influxdb_connection');
 const { Point } = require('@influxdata/influxdb-client');
 
