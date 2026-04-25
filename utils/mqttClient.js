@@ -1,7 +1,7 @@
 // utils/mqttClient.js
 const mqtt = require('mqtt');
 
-const MQTT_URL = process.env.MQTT_URL || 'mqtt://mosquitto:1883';
+const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt.aispektra.com:443';
 
 const client = mqtt.connect(MQTT_URL, {
   clientId: `express-backend-${Date.now()}`,

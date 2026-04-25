@@ -1,14 +1,12 @@
 // Lokasi: express-backend/db/influxdb_connection.js
 
 const { InfluxDB } = require('@influxdata/influxdb-client');
+const { getInfluxConfig } = require('./influxConfig');
 
 console.log("--> Memuat koneksi InfluxDB...");
 
 // Ambil konfigurasi dari environment variables
-const url = `http://${process.env.INFLUXDB_HOST || 'influxdb'}:8086`;
-const token = process.env.INFLUXDB_TOKEN;
-const org = process.env.INFLUXDB_ORG;
-const bucket = process.env.INFLUXDB_BUCKET;
+const { url, token, org, bucket } = getInfluxConfig();
 
 // Buat instance InfluxDB client
 const influxDB = new InfluxDB({ url, token });

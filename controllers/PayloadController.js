@@ -1,12 +1,15 @@
 // express-backend/controllers/PayloadController.js
 const { InfluxDB } = require('@influxdata/influxdb-client');
 const mysql = require('mysql2/promise');
+const { getInfluxConfig } = require('../db/influxConfig');
 
 // --- ENV (tahan banting) ---
-const influxUrl    = process.env.INFLUX_URL || `http://${process.env.INFLUXDB_HOST || 'influxdb'}:8086`;
-const influxToken  = process.env.INFLUX_TOKEN || process.env.INFLUXDB_TOKEN;
-const influxOrg    = process.env.INFLUX_ORG || process.env.INFLUXDB_ORG || 'my-org';
-const influxBucket = process.env.INFLUX_BUCKET || process.env.INFLUXDB_BUCKET || 'iot_data';
+const {
+  url: influxUrl,
+  token: influxToken,
+  org: influxOrg,
+  bucket: influxBucket,
+} = getInfluxConfig();
 
 const mysqlHost = process.env.MYSQL_HOST || process.env.DB_HOST || 'mysql';
 const mysqlDb   = process.env.MYSQL_DB   || process.env.DB_DATABASE || 'db_mysql_ais';

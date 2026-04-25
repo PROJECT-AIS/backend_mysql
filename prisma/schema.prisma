@@ -89,6 +89,27 @@ model Lokasi {
   @@map("lokasi")
 }
 
+model ShiftCode {
+  id          Int      @id @default(autoincrement())
+  namaShift   String   @db.VarChar(100) @map("nama_shift")
+  kodeShift   String   @unique @db.VarChar(20) @map("kode_shift")
+  rentangWaktu String  @db.VarChar(50) @map("rentang_waktu")
+  keterangan  String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("shift_code")
+}
+
+model MaterialType {
+  id          Int      @id @default(autoincrement())
+  jenisMuatan String   @unique @db.VarChar(100) @map("jenis_muatan")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("material_type")
+}
+
 model Kalibrasi {
   id              Int      @id @default(autoincrement())
   alatId          Int      @map("alat_id")

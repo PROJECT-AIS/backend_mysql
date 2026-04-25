@@ -3,14 +3,10 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 const mqtt = require('mqtt');
 
-const MQTT_HOST = process.env.MQTT_HOST || 'mosquitto';
-const MQTT_PORT = Number(process.env.MQTT_PORT || 1883);
+const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt.aispektra.com:443';
 
 // ---------- MQTT client ----------
-const mqttClient = mqtt.connect({
-  protocol: 'mqtt',
-  host: MQTT_HOST,
-  port: MQTT_PORT,
+const mqttClient = mqtt.connect(MQTT_URL, {
   connectTimeout: 30_000,
   reconnectPeriod: 5_000,
   resubscribe: true,

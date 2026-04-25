@@ -15,6 +15,9 @@ const configController = require('../controllers/ConfigController');
 const deviceController = require('../controllers/DeviceController');
 const eventController = require('../controllers/EventController');
 const PayloadController = require('../controllers/PayloadController');
+const InfluxController = require('../controllers/InfluxController');
+const DashboardController = require('../controllers/DashboardController');
+
 // NOTE: mqttPublish masih dipakai oleh route lain (/config, /log/send)
 const { publish: mqttPublish } = require('../utils/mqttClient');
 
@@ -82,6 +85,18 @@ router.delete('/profile/image', verifyToken, userController.deleteProfileImage);
 // PAYLOAD & TELEMETRY
 // =======================================================
 router.get('/payload/:vehicleId/latest', PayloadController.latestPayload);
+router.get('/influx/health', verifyToken, InfluxController.health);
+router.get('/influx/schema', verifyToken, InfluxController.schema);
+
+// =======================================================
+// DASHBOARD DATA (INFLUX)
+// =======================================================
+router.get('/dashboard/summary', verifyToken, DashboardController.getSummary);
+router.get('/dashboard/vehicles', verifyToken, DashboardController.getVehicles);
+router.get('/dashboard/vehicle/:vehicleId/fuel-realtime', verifyToken, DashboardController.getFuelRealtime);
+router.get('/dashboard/vehicle/:vehicleId/fuel-weekly', verifyToken, DashboardController.getFuelWeekly);
+router.get('/dashboard/history', verifyToken, DashboardController.getHistory);
+router.get('/dashboard/statistics', verifyToken, DashboardController.getStatistics);
 
 // =======================================================
 // RUTE DEVICES
@@ -114,6 +129,20 @@ router.get('/lokasi/:id', verifyToken, configController.getLokasiById);
 router.post('/lokasi', verifyToken, configController.createLokasi);
 router.put('/lokasi/:id', verifyToken, configController.updateLokasi);
 router.delete('/lokasi/:id', verifyToken, configController.deleteLokasi);
+
+// Shift Code
+router.get('/shift-code', verifyToken, configController.getAllShiftCode);
+router.get('/shift-code/:id', verifyToken, configController.getShiftCodeById);
+router.post('/shift-code', verifyToken, configController.createShiftCode);
+router.put('/shift-code/:id', verifyToken, configController.updateShiftCode);
+router.delete('/shift-code/:id', verifyToken, configController.deleteShiftCode);
+
+// Material Type
+router.get('/material-type', verifyToken, configController.getAllMaterialType);
+router.get('/material-type/:id', verifyToken, configController.getMaterialTypeById);
+router.post('/material-type', verifyToken, configController.createMaterialType);
+router.put('/material-type/:id', verifyToken, configController.updateMaterialType);
+router.delete('/material-type/:id', verifyToken, configController.deleteMaterialType);
 
 // Kalibrasi
 router.get('/kalibrasi', verifyToken, configController.getAllKalibrasi);

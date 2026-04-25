@@ -197,6 +197,152 @@ exports.deleteLokasi = async (req, res) => {
     }
 }
 
+// ===================== SHIFT CODE =====================
+exports.getAllShiftCode = async (req, res) => {
+    try {
+        const shiftCode = await prisma.shiftCode.findMany({
+            orderBy: [{ kodeShift: 'asc' }, { createdAt: 'desc' }]
+        })
+        res.json({ success: true, data: shiftCode })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.getShiftCodeById = async (req, res) => {
+    try {
+        const shiftCode = await prisma.shiftCode.findUnique({
+            where: { id: parseInt(req.params.id) }
+        })
+        if (!shiftCode) {
+            return res.status(404).json({ success: false, message: 'Shift code tidak ditemukan' })
+        }
+        res.json({ success: true, data: shiftCode })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.createShiftCode = async (req, res) => {
+    try {
+        const { namaShift, kodeShift, rentangWaktu, keterangan } = req.body
+        const shiftCode = await prisma.shiftCode.create({
+            data: {
+                namaShift,
+                kodeShift,
+                rentangWaktu,
+                keterangan: keterangan || null,
+            }
+        })
+        res.status(201).json({ success: true, data: shiftCode })
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ success: false, message: 'Kode shift sudah terdaftar' })
+        }
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.updateShiftCode = async (req, res) => {
+    try {
+        const { namaShift, kodeShift, rentangWaktu, keterangan } = req.body
+        const shiftCode = await prisma.shiftCode.update({
+            where: { id: parseInt(req.params.id) },
+            data: {
+                namaShift,
+                kodeShift,
+                rentangWaktu,
+                keterangan: keterangan || null,
+            }
+        })
+        res.json({ success: true, data: shiftCode })
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ success: false, message: 'Kode shift sudah terdaftar' })
+        }
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.deleteShiftCode = async (req, res) => {
+    try {
+        await prisma.shiftCode.delete({
+            where: { id: parseInt(req.params.id) }
+        })
+        res.json({ success: true, message: 'Shift code berhasil dihapus' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+// ===================== MATERIAL TYPE =====================
+exports.getAllMaterialType = async (req, res) => {
+    try {
+        const materialType = await prisma.materialType.findMany({
+            orderBy: [{ jenisMuatan: 'asc' }, { createdAt: 'desc' }]
+        })
+        res.json({ success: true, data: materialType })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.getMaterialTypeById = async (req, res) => {
+    try {
+        const materialType = await prisma.materialType.findUnique({
+            where: { id: parseInt(req.params.id) }
+        })
+        if (!materialType) {
+            return res.status(404).json({ success: false, message: 'Material type tidak ditemukan' })
+        }
+        res.json({ success: true, data: materialType })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.createMaterialType = async (req, res) => {
+    try {
+        const { jenisMuatan } = req.body
+        const materialType = await prisma.materialType.create({
+            data: { jenisMuatan }
+        })
+        res.status(201).json({ success: true, data: materialType })
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ success: false, message: 'Jenis muatan sudah terdaftar' })
+        }
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.updateMaterialType = async (req, res) => {
+    try {
+        const { jenisMuatan } = req.body
+        const materialType = await prisma.materialType.update({
+            where: { id: parseInt(req.params.id) },
+            data: { jenisMuatan }
+        })
+        res.json({ success: true, data: materialType })
+    } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ success: false, message: 'Jenis muatan sudah terdaftar' })
+        }
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
+exports.deleteMaterialType = async (req, res) => {
+    try {
+        await prisma.materialType.delete({
+            where: { id: parseInt(req.params.id) }
+        })
+        res.json({ success: true, message: 'Material type berhasil dihapus' })
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message })
+    }
+}
+
 // ===================== KALIBRASI =====================
 exports.getAllKalibrasi = async (req, res) => {
     try {
