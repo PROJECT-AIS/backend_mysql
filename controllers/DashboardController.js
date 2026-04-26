@@ -134,9 +134,10 @@ const getFuelRealtime = async (req, res) => {
   try {
     const flux = `
       from(bucket: "${config.bucket}")
-        |> range(start: -24h)
+        |> range(start: -6h) 
         |> filter(fn: (r) => r.vehicle_id == "${vehicleId}" and r._field == "fuel_vol_l")
-        |> aggregateWindow(every: 5m, fn: mean, createEmpty: false)
+        |> aggregateWindow(every: 5m, fn: last, createEmpty: true)
+        |> fill(usePrevious: true)
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: 10)
     `;
