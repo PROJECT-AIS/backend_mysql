@@ -13,6 +13,6 @@ COPY . .
 # Sekarang jalankan 'prisma generate' SETELAH semua file ada
 RUN npx prisma generate
 
-EXPOSE 3000
+EXPOSE 6969
 
 CMD ["node", "index.js"]

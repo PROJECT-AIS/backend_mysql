@@ -28,7 +28,7 @@ if (!fs.existsSync(uploadsDir)) {
 // Serve static files from uploads directory
 app.use('/uploads', express.static(uploadsDir))
 
-const port = 6969;
+const port = Number(process.env.PORT) || 6969;
 
 app.use((req, res, next) => {
     console.log(`[REQUEST] ${req.method} ${req.originalUrl}`);
