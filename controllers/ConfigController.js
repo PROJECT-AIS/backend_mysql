@@ -75,7 +75,7 @@ exports.deleteAlat = async (req, res) => {
 // ===================== OPERATOR =====================
 exports.getAllOperator = async (req, res) => {
     try {
-        const operator = await prisma.operator.findMany({
+        const operator = await prisma.operatorNfc.findMany({
             orderBy: { createdAt: 'desc' }
         })
         res.json({ success: true, data: operator })
@@ -86,7 +86,7 @@ exports.getAllOperator = async (req, res) => {
 
 exports.getOperatorById = async (req, res) => {
     try {
-        const operator = await prisma.operator.findUnique({
+        const operator = await prisma.operatorNfc.findUnique({
             where: { id: parseInt(req.params.id) }
         })
         if (!operator) {
@@ -101,7 +101,7 @@ exports.getOperatorById = async (req, res) => {
 exports.createOperator = async (req, res) => {
     try {
         const { nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
-        const operator = await prisma.operator.create({
+        const operator = await prisma.operatorNfc.create({
             data: { nama, noTelp, divisi, idCardNfc, jabatan, alamat }
         })
         res.status(201).json({ success: true, data: operator })
@@ -113,7 +113,7 @@ exports.createOperator = async (req, res) => {
 exports.updateOperator = async (req, res) => {
     try {
         const { nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
-        const operator = await prisma.operator.update({
+        const operator = await prisma.operatorNfc.update({
             where: { id: parseInt(req.params.id) },
             data: { nama, noTelp, divisi, idCardNfc, jabatan, alamat }
         })
@@ -125,7 +125,7 @@ exports.updateOperator = async (req, res) => {
 
 exports.deleteOperator = async (req, res) => {
     try {
-        await prisma.operator.delete({
+        await prisma.operatorNfc.delete({
             where: { id: parseInt(req.params.id) }
         })
         res.json({ success: true, message: 'Operator berhasil dihapus' })
