@@ -123,6 +123,13 @@ router.post('/operator', verifyToken, configController.createOperator);
 router.put('/operator/:id', verifyToken, configController.updateOperator);
 router.delete('/operator/:id', verifyToken, configController.deleteOperator);
 
+//versi esp nya operator
+router.get('/esp/operator', configController.getAllOperator);
+router.get('/esp/operator/:id', configController.getOperatorById);
+router.post('/esp/operator', configController.createOperator);
+router.put('/esp/operator/:id', configController.updateOperator);
+router.delete('/esp/operator/:id', configController.deleteOperator);
+
 // Lokasi (with public ESP endpoints below)
 router.get('/lokasi', verifyToken, configController.getAllLokasi);
 router.get('/lokasi/:id', verifyToken, configController.getLokasiById);
