@@ -63,15 +63,16 @@ model Alat {
 }
 
 model OperatorNfc {
-  id        Int      @id @default(autoincrement())
-  nama      String   @db.VarChar(255)
-  noTelp    String?  @map("no_telp") @db.VarChar(20)
-  divisi    String?  @db.VarChar(100)
-  idCardNfc String?  @map("id_card_nfc") @db.VarChar(100)
-  jabatan   String?  @db.VarChar(100)
-  alamat    String?  @db.Text
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         Int      @id @default(autoincrement())
+  idOperator String?  @map("id_operator") @db.VarChar(50)
+  nama       String   @db.VarChar(255)
+  noTelp     String?  @map("no_telp") @db.VarChar(20)
+  divisi     String?  @db.VarChar(100)
+  idCardNfc  String?  @map("id_card_nfc") @db.VarChar(100)
+  jabatan    String?  @db.VarChar(100)
+  alamat     String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("operator")
 }

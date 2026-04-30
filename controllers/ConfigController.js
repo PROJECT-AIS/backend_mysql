@@ -100,9 +100,9 @@ exports.getOperatorById = async (req, res) => {
 
 exports.createOperator = async (req, res) => {
     try {
-        const { nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
+        const { idOperator, nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
         const operator = await prisma.operatorNfc.create({
-            data: { nama, noTelp, divisi, idCardNfc, jabatan, alamat }
+            data: { idOperator, nama, noTelp, divisi, idCardNfc, jabatan, alamat }
         })
         res.status(201).json({ success: true, data: operator })
     } catch (error) {
@@ -112,10 +112,10 @@ exports.createOperator = async (req, res) => {
 
 exports.updateOperator = async (req, res) => {
     try {
-        const { nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
+        const { idOperator, nama, noTelp, divisi, idCardNfc, jabatan, alamat } = req.body
         const operator = await prisma.operatorNfc.update({
             where: { id: parseInt(req.params.id) },
-            data: { nama, noTelp, divisi, idCardNfc, jabatan, alamat }
+            data: { idOperator, nama, noTelp, divisi, idCardNfc, jabatan, alamat }
         })
         res.json({ success: true, data: operator })
     } catch (error) {
