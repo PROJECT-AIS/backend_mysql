@@ -9,12 +9,17 @@ const router = require('./routes')
 
 const app = express()
 
-// CORS configuration - allow all origins for development
+// CORS configuration
 app.use(cors({
-    origin: true,
-    credentials: true,
+    origin: [
+        'https://fms.devraffi.my.id',
+        'http://fms.devraffi.my.id',
+        'http://localhost:5173',
+        'http://127.0.0.1:5173'
+    ],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    credentials: true
 }))
 
 app.use(express.json())
