@@ -15,7 +15,7 @@ model User {
   email        String   @unique @db.VarChar(255)
   phone        String?  @db.VarChar(20)
   password     String?  @db.VarChar(255)
-  profileImage String?  @db.VarChar(500) @map("profile_image")
+  profileImage String?  @map("profile_image") @db.VarChar(500)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -23,12 +23,12 @@ model User {
 }
 
 model Device {
-  id         Int      @id @default(autoincrement())
-  vehicleId  String   @unique @map("vehicle_id")
-  deviceId   String?  @unique @map("device_id")
-  notes      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        Int      @id @default(autoincrement())
+  vehicleId String   @unique @map("vehicle_id")
+  deviceId  String?  @unique @map("device_id")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("devices")
 }
@@ -48,16 +48,16 @@ model OperatorRfid {
 // ========== MODELS FROM BACKEND_MYSQL-MAIN ==========
 
 model Alat {
-  id          Int         @id @default(autoincrement())
-  idFms       String      @unique @db.VarChar(50) @map("id_fms")
-  noPlat      String      @db.VarChar(20) @map("no_plat")
-  jenisAlat   String      @db.VarChar(100) @map("jenis_alat")
-  detailAlat  String?     @db.Text @map("detail_alat")
-  gambar      String?     @db.VarChar(500)
-  status      String      @default("Aktif") @db.VarChar(50)
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
-  kalibrasi   Kalibrasi[]
+  id         Int         @id @default(autoincrement())
+  idFms      String      @unique @map("id_fms") @db.VarChar(50)
+  noPlat     String      @map("no_plat") @db.VarChar(20)
+  jenisAlat  String      @map("jenis_alat") @db.VarChar(100)
+  detailAlat String?     @map("detail_alat") @db.Text
+  gambar     String?     @db.VarChar(500)
+  status     String      @default("Aktif") @db.VarChar(50)
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  kalibrasi  Kalibrasi[]
 
   @@map("alat")
 }
@@ -65,9 +65,9 @@ model Alat {
 model OperatorNfc {
   id        Int      @id @default(autoincrement())
   nama      String   @db.VarChar(255)
-  noTelp    String?  @db.VarChar(20) @map("no_telp")
+  noTelp    String?  @map("no_telp") @db.VarChar(20)
   divisi    String?  @db.VarChar(100)
-  idCardNfc String?  @db.VarChar(100) @map("id_card_nfc")
+  idCardNfc String?  @map("id_card_nfc") @db.VarChar(100)
   jabatan   String?  @db.VarChar(100)
   alamat    String?  @db.Text
   createdAt DateTime @default(now()) @map("created_at")
@@ -90,20 +90,20 @@ model Lokasi {
 }
 
 model ShiftCode {
-  id          Int      @id @default(autoincrement())
-  namaShift   String   @db.VarChar(100) @map("nama_shift")
-  kodeShift   String   @unique @db.VarChar(20) @map("kode_shift")
-  rentangWaktu String  @db.VarChar(50) @map("rentang_waktu")
-  keterangan  String?  @db.VarChar(255)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id           Int      @id @default(autoincrement())
+  namaShift    String   @map("nama_shift") @db.VarChar(100)
+  kodeShift    String   @unique @map("kode_shift") @db.VarChar(20)
+  rentangWaktu String   @map("rentang_waktu") @db.VarChar(50)
+  keterangan   String?  @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@map("shift_code")
 }
 
 model MaterialType {
   id          Int      @id @default(autoincrement())
-  jenisMuatan String   @unique @db.VarChar(100) @map("jenis_muatan")
+  jenisMuatan String   @unique @map("jenis_muatan") @db.VarChar(100)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -128,10 +128,72 @@ model Pengawas {
   nama       String   @db.VarChar(255)
   email      String   @unique @db.VarChar(255)
   password   String   @db.VarChar(255)
-  noTelp     String?  @db.VarChar(20) @map("no_telp")
-  fotoProfil String?  @db.VarChar(500) @map("foto_profil")
+  noTelp     String?  @map("no_telp") @db.VarChar(20)
+  fotoProfil String?  @map("foto_profil") @db.VarChar(500)
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("pengawas")
+}
+
+model DataLog {
+  id        Int      @id @default(autoincrement())
+  waktu     DateTime @default(now())
+  idAlat    String?  @map("id_alat") @db.VarChar(50)
+  noPol     String?  @map("no_pol") @db.VarChar(20)
+  jenisAlat String?  @map("jenis_alat") @db.VarChar(100)
+  merekAlat String?  @map("merek_alat") @db.VarChar(100)
+  trip      String?  @db.VarChar(100)
+
+  // Data GPS
+  latitude  String? @db.VarChar(50)
+  longitude String? @db.VarChar(50)
+  kecepatan Float?  @map("kecepatan_kendaraan")
+
+  jenisMuatan String? @map("jenis_muatan") @db.VarChar(100)
+
+  // Data Sensor Fuel
+  volumeFuel        Float?  @map("volume_fuel")
+  konsumsiFuel      Float?  @map("konsumsi_fuel")
+  anomaliStatusFuel String? @map("anomali_status_fuel") @db.VarChar(100)
+  fuelMasuk         Float?  @map("fuel_masuk")
+
+  // Status Alat
+  statusAlat         String? @map("status_alat") @db.VarChar(50)
+  start              String? @db.VarChar(50)
+  rentangWaktuAktif  String? @map("rentang_waktu_aktif") @db.VarChar(50)
+  durasiAktif        String? @map("durasi_aktif") @db.VarChar(50)
+  rentangWaktuPassif String? @map("rentang_waktu_passif") @db.VarChar(50)
+  durasiPassif       String? @map("durasi_passif") @db.VarChar(50)
+  mati               String? @db.VarChar(50)
+
+  // Operator & Trip
+  namaOperator String? @map("nama_operator") @db.VarChar(255)
+  idOperator   String? @map("id_operator") @db.VarChar(50)
+  statusTrip   String? @map("status_trip") @db.VarChar(50)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("data_log")
+}
+
+model DataTrip {
+  id           Int      @id @default(autoincrement())
+  idAlat       String?  @map("id_alat") @db.VarChar(50)
+  trip         String?  @db.VarChar(100)
+  tanggal      String?  @db.VarChar(50)
+  lokasiStart  String?  @map("lokasi_start") @db.VarChar(100)
+  lokasiFinish String?  @map("lokasi_finish") @db.VarChar(100)
+  namaOperator String?  @map("nama_operator") @db.VarChar(255)
+  idOperator   String?  @map("id_operator") @db.VarChar(50)
+  jenisMuatan  String?  @map("jenis_muatan") @db.VarChar(100)
+  waktuStart   String?  @map("waktu_start") @db.VarChar(50)
+  waktuFinish  String?  @map("waktu_finish") @db.VarChar(50)
+  durasi       String?  @db.VarChar(50)
+  
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("data_trip")
 }

@@ -51,4 +51,5 @@ ALTER TABLE `device_calibrations` ADD CONSTRAINT `device_calibrations_device_id_
 ALTER TABLE `drowsiness_events` ADD CONSTRAINT `drowsiness_events_device_id_fkey` FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- RenameIndex
-ALTER TABLE `users` RENAME INDEX `email` TO `users_email_key`;
+DROP INDEX `email` ON `users`;
+CREATE UNIQUE INDEX `users_email_key` ON `users`(`email`);

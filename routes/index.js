@@ -17,7 +17,8 @@ const eventController = require('../controllers/EventController');
 const PayloadController = require('../controllers/PayloadController');
 const InfluxController = require('../controllers/InfluxController');
 const DashboardController = require('../controllers/DashboardController');
-
+const dataLogController = require('../controllers/DataLogController');
+const dataTripController = require('../controllers/DataTripController');
 // NOTE: mqttPublish masih dipakai oleh route lain (/config, /log/send)
 const { publish: mqttPublish } = require('../utils/mqttClient');
 
@@ -179,6 +180,26 @@ router.get('/esp/material-type/:id', configController.getMaterialTypeById);
 router.post('/esp/material-type', configController.createMaterialType);
 router.put('/esp/material-type/:id', configController.updateMaterialType);
 router.delete('/esp/material-type/:id', configController.deleteMaterialType);
+
+// =======================================================
+// RUTE DATA LOG
+// =======================================================
+router.get('/datalog', verifyToken, dataLogController.getAll);
+router.get('/datalog/:id', verifyToken, dataLogController.getById);
+router.post('/datalog', verifyToken, dataLogController.create);
+
+// Versi ESP (Public Endpoint tanpa Auth)
+router.post('/esp/datalog', dataLogController.create);
+
+// =======================================================
+// RUTE DATA TRIP
+// =======================================================
+router.get('/datatrip', verifyToken, dataTripController.getAll);
+router.get('/datatrip/:id', verifyToken, dataTripController.getById);
+router.post('/datatrip', verifyToken, dataTripController.create);
+
+// Versi ESP (Public Endpoint tanpa Auth)
+router.post('/esp/datatrip', dataTripController.create);
 
 // =======================================================
 // RUTE EVENT & UPLOAD
