@@ -57,7 +57,6 @@ const getSummary = async (req, res) => {
     let onDevices = 0;
     let offDevices = 0;
     let totalConsumsiBbm = 0;
-    const vehicleStates = {};
 
     rows.forEach(row => {
       if (row._field === 'unit_state_code') {
@@ -70,29 +69,38 @@ const getSummary = async (req, res) => {
     });
 
     // Real production data from Prisma
-    const [allMaterialTypes, dataTrips] = await Promise.all([
-      prisma.materialType.findMany(),
-      prisma.dataTrip.findMany()
-    ]);
+    const dataTrips = await prisma.dataTrip.findMany();
     
-    const totalProduksi = dataTrips.length;
-    
-    // Initialize map with all material types set to 0
+    // STRICTLY use only standard labels
+    const categories = [
+      'OB - Disposal',
+      'LIM ORE - Stockpile',
+      'LIM ORE - Barge',
+      'SAP ORE - Stockpile',
+      'SAP ORE - Barge'
+    ];
+
     const produksiMap = {};
-    allMaterialTypes.forEach(mt => {
-      produksiMap[mt.jenisMuatan] = 0;
+    categories.forEach(label => {
+      produksiMap[label] = 0;
     });
 
-    // Count trips per material type
     dataTrips.forEach(trip => {
-      if (trip.jenisMuatan) {
-        produksiMap[trip.jenisMuatan] = (produksiMap[trip.jenisMuatan] || 0) + 1;
+      const type = (trip.jenisMuatan || '').toUpperCase();
+      if (type.includes('OB')) {
+        produksiMap['OB - Disposal']++;
+      } else if (type.includes('LIM')) {
+        if (type.includes('BARGE')) produksiMap['LIM ORE - Barge']++;
+        else produksiMap['LIM ORE - Stockpile']++;
+      } else if (type.includes('SAP')) {
+        if (type.includes('BARGE')) produksiMap['SAP ORE - Barge']++;
+        else produksiMap['SAP ORE - Stockpile']++;
       }
     });
 
-    const produksi_items = Object.entries(produksiMap).map(([label, value]) => ({
+    const produksi_items = categories.map(label => ({
       label,
-      value
+      value: produksiMap[label]
     }));
 
     res.json({
@@ -108,7 +116,7 @@ const getSummary = async (req, res) => {
         passive: 0,
         off: offDevices
       },
-      total_produksi: totalProduksi,
+      total_produksi: dataTrips.length,
       produksi_items: produksi_items,
       konsumsi_bbm: totalConsumsiBbm
     });
