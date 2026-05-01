@@ -1,5 +1,7 @@
 const { InfluxDB } = require('@influxdata/influxdb-client');
 const { getInfluxConfig } = require('../db/influxConfig');
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
 let cachedQueryApi = null;
 let cachedQueryKey = '';
@@ -67,8 +69,31 @@ const getSummary = async (req, res) => {
       }
     });
 
-    // Mock production data for now as it depends on complex trip logic
-    const totalProduksi = 1000; 
+    // Real production data from Prisma
+    const [allMaterialTypes, dataTrips] = await Promise.all([
+      prisma.materialType.findMany(),
+      prisma.dataTrip.findMany()
+    ]);
+    
+    const totalProduksi = dataTrips.length;
+    
+    // Initialize map with all material types set to 0
+    const produksiMap = {};
+    allMaterialTypes.forEach(mt => {
+      produksiMap[mt.jenisMuatan] = 0;
+    });
+
+    // Count trips per material type
+    dataTrips.forEach(trip => {
+      if (trip.jenisMuatan) {
+        produksiMap[trip.jenisMuatan] = (produksiMap[trip.jenisMuatan] || 0) + 1;
+      }
+    });
+
+    const produksi_items = Object.entries(produksiMap).map(([label, value]) => ({
+      label,
+      value
+    }));
 
     res.json({
       status_device: {
@@ -84,6 +109,7 @@ const getSummary = async (req, res) => {
         off: offDevices
       },
       total_produksi: totalProduksi,
+      produksi_items: produksi_items,
       konsumsi_bbm: totalConsumsiBbm
     });
   } catch (err) {
