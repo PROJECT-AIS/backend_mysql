@@ -8,13 +8,6 @@ exports.getAllAlat = async (req, res) => {
         const alat = await prisma.alat.findMany({
             orderBy: { createdAt: 'desc' }
         })
-
-// ===================== ALAT =====================
-exports.getAllAlat = async (req, res) => {
-    try {
-        const alat = await prisma.alat.findMany({
-            orderBy: { createdAt: 'desc' }
-        })
         res.json({ success: true, data: alat })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
