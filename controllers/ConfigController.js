@@ -8,6 +8,13 @@ exports.getAllAlat = async (req, res) => {
         const alat = await prisma.alat.findMany({
             orderBy: { createdAt: 'desc' }
         })
+
+// ===================== ALAT =====================
+exports.getAllAlat = async (req, res) => {
+    try {
+        const alat = await prisma.alat.findMany({
+            orderBy: { createdAt: 'desc' }
+        })
         res.json({ success: true, data: alat })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
@@ -30,11 +37,19 @@ exports.getAlatById = async (req, res) => {
 
 exports.createAlat = async (req, res) => {
     try {
-        const { idFms, noPlat, jenisAlat, detailAlat, status } = req.body
-        const gambar = req.file ? `/uploads/${req.file.filename}` : null
+        const { idFms, noUnit, jenisAlat, merk, kapasitasMuat, kapasitasTangki, tahunManufaktur, status } = req.body
 
         const alat = await prisma.alat.create({
-            data: { idFms, noPlat, jenisAlat, detailAlat, gambar, status: status || 'Aktif' }
+            data: { 
+                idFms, 
+                noUnit, 
+                jenisAlat, 
+                merk, 
+                kapasitasMuat: parseFloat(kapasitasMuat) || null,
+                kapasitasTangki: parseInt(kapasitasTangki) || null,
+                tahunManufaktur: parseInt(tahunManufaktur) || null,
+                status: status || 'Aktif' 
+            }
         })
         res.status(201).json({ success: true, data: alat })
     } catch (error) {
@@ -44,11 +59,17 @@ exports.createAlat = async (req, res) => {
 
 exports.updateAlat = async (req, res) => {
     try {
-        const { idFms, noPlat, jenisAlat, detailAlat, status } = req.body
-        const updateData = { idFms, noPlat, jenisAlat, detailAlat, status }
-
-        if (req.file) {
-            updateData.gambar = `/uploads/${req.file.filename}`
+        const { idFms, noUnit, jenisAlat, merk, kapasitasMuat, kapasitasTangki, tahunManufaktur, status } = req.body
+        
+        const updateData = { 
+            idFms, 
+            noUnit, 
+            jenisAlat, 
+            merk, 
+            kapasitasMuat: parseFloat(kapasitasMuat) || null,
+            kapasitasTangki: parseInt(kapasitasTangki) || null,
+            tahunManufaktur: parseInt(tahunManufaktur) || null,
+            status 
         }
 
         const alat = await prisma.alat.update({

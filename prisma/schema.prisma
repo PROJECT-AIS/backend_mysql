@@ -48,16 +48,18 @@ model OperatorRfid {
 // ========== MODELS FROM BACKEND_MYSQL-MAIN ==========
 
 model Alat {
-  id         Int         @id @default(autoincrement())
-  idFms      String      @unique @map("id_fms") @db.VarChar(50)
-  noPlat     String      @map("no_plat") @db.VarChar(20)
-  jenisAlat  String      @map("jenis_alat") @db.VarChar(100)
-  detailAlat String?     @map("detail_alat") @db.Text
-  gambar     String?     @db.VarChar(500)
-  status     String      @default("Aktif") @db.VarChar(50)
-  createdAt  DateTime    @default(now()) @map("created_at")
-  updatedAt  DateTime    @updatedAt @map("updated_at")
-  kalibrasi  Kalibrasi[]
+  id              Int         @id @default(autoincrement())
+  idFms           String      @unique @map("id_fms") @db.VarChar(50)
+  noUnit          String      @map("no_unit") @db.VarChar(50)
+  jenisAlat       String      @map("jenis_alat") @db.VarChar(100)
+  merk            String?     @db.VarChar(100)
+  kapasitasMuat   Float?      @map("kapasitas_muat")
+  kapasitasTangki Int?        @map("kapasitas_tangki")
+  tahunManufaktur Int?        @map("tahun_manufaktur")
+  status          String      @default("Aktif") @db.VarChar(50)
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+  kalibrasi       Kalibrasi[]
 
   @@map("alat")
 }
