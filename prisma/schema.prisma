@@ -1,5 +1,3 @@
-// Lokasi: express-backend/prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -33,7 +31,6 @@ model Device {
   @@map("devices")
 }
 
-// IoT RFID-based operators (existing)
 model OperatorRfid {
   id        Int      @id @default(autoincrement())
   name      String   @db.VarChar(128)
@@ -45,20 +42,18 @@ model OperatorRfid {
   @@map("operators")
 }
 
-// ========== MODELS FROM BACKEND_MYSQL-MAIN ==========
-
 model Alat {
   id              Int         @id @default(autoincrement())
   idFms           String      @unique @map("id_fms") @db.VarChar(50)
-  noUnit          String      @map("no_unit") @db.VarChar(50)
   jenisAlat       String      @map("jenis_alat") @db.VarChar(100)
-  merk            String?     @db.VarChar(100)
-  kapasitasMuat   Float?      @map("kapasitas_muat")
-  kapasitasTangki Int?        @map("kapasitas_tangki")
-  tahunManufaktur Int?        @map("tahun_manufaktur")
   status          String      @default("Aktif") @db.VarChar(50)
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
+  kapasitasMuat   Float?      @map("kapasitas_muat")
+  kapasitasTangki Int?        @map("kapasitas_tangki")
+  merk            String?     @db.VarChar(100)
+  noUnit          String      @map("no_unit") @db.VarChar(50)
+  tahunManufaktur Int?        @map("tahun_manufaktur")
   kalibrasi       Kalibrasi[]
 
   @@map("alat")
@@ -66,7 +61,6 @@ model Alat {
 
 model OperatorNfc {
   id         Int      @id @default(autoincrement())
-  idOperator String?  @map("id_operator") @db.VarChar(50)
   nama       String   @db.VarChar(255)
   noTelp     String?  @map("no_telp") @db.VarChar(20)
   divisi     String?  @db.VarChar(100)
@@ -75,6 +69,7 @@ model OperatorNfc {
   alamat     String?  @db.Text
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+  idOperator String?  @map("id_operator") @db.VarChar(50)
 
   @@map("operator")
 }
@@ -123,6 +118,7 @@ model Kalibrasi {
   updatedAt       DateTime @updatedAt @map("updated_at")
   alat            Alat     @relation(fields: [alatId], references: [id], onDelete: Cascade)
 
+  @@index([alatId], map: "kalibrasi_alat_id_fkey")
   @@map("kalibrasi")
 }
 
@@ -140,43 +136,33 @@ model Pengawas {
 }
 
 model DataLog {
-  id        Int      @id @default(autoincrement())
-  waktu     DateTime @default(now())
-  idAlat    String?  @map("id_alat") @db.VarChar(50)
-  noPol     String?  @map("no_pol") @db.VarChar(20)
-  jenisAlat String?  @map("jenis_alat") @db.VarChar(100)
-  merekAlat String?  @map("merek_alat") @db.VarChar(100)
-  trip      String?  @db.VarChar(100)
-
-  // Data GPS
-  latitude  String? @db.VarChar(50)
-  longitude String? @db.VarChar(50)
-  kecepatan Float?  @map("kecepatan_kendaraan")
-
-  jenisMuatan String? @map("jenis_muatan") @db.VarChar(100)
-
-  // Data Sensor Fuel
-  volumeFuel        Float?  @map("volume_fuel")
-  konsumsiFuel      Float?  @map("konsumsi_fuel")
-  anomaliStatusFuel String? @map("anomali_status_fuel") @db.VarChar(100)
-  fuelMasuk         Float?  @map("fuel_masuk")
-
-  // Status Alat
-  statusAlat         String? @map("status_alat") @db.VarChar(50)
-  start              String? @db.VarChar(50)
-  rentangWaktuAktif  String? @map("rentang_waktu_aktif") @db.VarChar(50)
-  durasiAktif        String? @map("durasi_aktif") @db.VarChar(50)
-  rentangWaktuPassif String? @map("rentang_waktu_passif") @db.VarChar(50)
-  durasiPassif       String? @map("durasi_passif") @db.VarChar(50)
-  mati               String? @db.VarChar(50)
-
-  // Operator & Trip
-  namaOperator String? @map("nama_operator") @db.VarChar(255)
-  idOperator   String? @map("id_operator") @db.VarChar(50)
-  statusTrip   String? @map("status_trip") @db.VarChar(50)
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id                 Int      @id @default(autoincrement())
+  waktu              DateTime @default(now())
+  idAlat             String?  @map("id_alat") @db.VarChar(50)
+  noPol              String?  @map("no_pol") @db.VarChar(20)
+  jenisAlat          String?  @map("jenis_alat") @db.VarChar(100)
+  merekAlat          String?  @map("merek_alat") @db.VarChar(100)
+  trip               String?  @db.VarChar(100)
+  latitude           String?  @db.VarChar(50)
+  longitude          String?  @db.VarChar(50)
+  kecepatan          Float?   @map("kecepatan_kendaraan")
+  jenisMuatan        String?  @map("jenis_muatan") @db.VarChar(100)
+  volumeFuel         Float?   @map("volume_fuel")
+  konsumsiFuel       Float?   @map("konsumsi_fuel")
+  anomaliStatusFuel  String?  @map("anomali_status_fuel") @db.VarChar(100)
+  fuelMasuk          Float?   @map("fuel_masuk")
+  statusAlat         String?  @map("status_alat") @db.VarChar(50)
+  start              String?  @db.VarChar(50)
+  rentangWaktuAktif  String?  @map("rentang_waktu_aktif") @db.VarChar(50)
+  durasiAktif        String?  @map("durasi_aktif") @db.VarChar(50)
+  rentangWaktuPassif String?  @map("rentang_waktu_passif") @db.VarChar(50)
+  durasiPassif       String?  @map("durasi_passif") @db.VarChar(50)
+  mati               String?  @db.VarChar(50)
+  namaOperator       String?  @map("nama_operator") @db.VarChar(255)
+  idOperator         String?  @map("id_operator") @db.VarChar(50)
+  statusTrip         String?  @map("status_trip") @db.VarChar(50)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
 
   @@map("data_log")
 }
@@ -194,7 +180,6 @@ model DataTrip {
   waktuStart   String?  @map("waktu_start") @db.VarChar(50)
   waktuFinish  String?  @map("waktu_finish") @db.VarChar(50)
   durasi       String?  @db.VarChar(50)
-  
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 

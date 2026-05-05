@@ -1,6 +1,77 @@
+const { Prisma } = require('@prisma/client')
 const prisma = require('../prisma/client')
 const path = require('path')
 const fs = require('fs')
+
+const alatFields = new Set(
+    (Prisma?.dmmf?.datamodel?.models?.find((model) => model.name === 'Alat')?.fields || []).map((field) => field.name)
+)
+const alatUnitField = alatFields.has('noUnit') ? 'noUnit' : 'noPlat'
+
+const isBlank = (value) => value === undefined || value === null || value === ''
+
+const toNullableFloat = (value) => {
+    if (isBlank(value)) return null
+    const parsed = parseFloat(value)
+    return Number.isNaN(parsed) ? null : parsed
+}
+
+const toNullableInt = (value) => {
+    if (isBlank(value)) return null
+    const parsed = parseInt(value, 10)
+    return Number.isNaN(parsed) ? null : parsed
+}
+
+const getAlatUnitValue = (payload = {}) => {
+    if (!isBlank(payload.noUnit)) return payload.noUnit
+    if (!isBlank(payload.noPlat)) return payload.noPlat
+    return null
+}
+
+const normalizeAlat = (alat) => {
+    if (!alat) return alat
+
+    const noUnit = alat.noUnit ?? alat.noPlat ?? null
+
+    return {
+        ...alat,
+        noUnit,
+        noPlat: noUnit,
+    }
+}
+
+const normalizeKalibrasi = (item) => {
+    if (!item) return item
+
+    return {
+        ...item,
+        alat: normalizeAlat(item.alat),
+    }
+}
+
+const buildAlatPayload = (payload = {}, { useDefaultStatus = false } = {}) => {
+    const unitValue = getAlatUnitValue(payload)
+    const data = {
+        idFms: payload.idFms,
+        jenisAlat: payload.jenisAlat,
+        merk: isBlank(payload.merk) ? null : payload.merk,
+        kapasitasMuat: toNullableFloat(payload.kapasitasMuat),
+        kapasitasTangki: toNullableInt(payload.kapasitasTangki),
+        tahunManufaktur: toNullableInt(payload.tahunManufaktur),
+    }
+
+    if (unitValue !== null) {
+        data[alatUnitField] = unitValue
+    }
+
+    if (useDefaultStatus) {
+        data.status = payload.status || 'Aktif'
+    } else if (payload.status !== undefined) {
+        data.status = payload.status
+    }
+
+    return data
+}
 
 // ===================== ALAT =====================
 exports.getAllAlat = async (req, res) => {
@@ -8,7 +79,7 @@ exports.getAllAlat = async (req, res) => {
         const alat = await prisma.alat.findMany({
             orderBy: { createdAt: 'desc' }
         })
-        res.json({ success: true, data: alat })
+        res.json({ success: true, data: alat.map(normalizeAlat) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -22,7 +93,7 @@ exports.getAlatById = async (req, res) => {
         if (!alat) {
             return res.status(404).json({ success: false, message: 'Alat tidak ditemukan' })
         }
-        res.json({ success: true, data: alat })
+        res.json({ success: true, data: normalizeAlat(alat) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -30,21 +101,19 @@ exports.getAlatById = async (req, res) => {
 
 exports.createAlat = async (req, res) => {
     try {
-        const { idFms, noUnit, jenisAlat, merk, kapasitasMuat, kapasitasTangki, tahunManufaktur, status } = req.body
+        const unitValue = getAlatUnitValue(req.body)
+
+        if (!req.body.idFms || !unitValue || !req.body.jenisAlat) {
+            return res.status(400).json({
+                success: false,
+                message: 'idFms, noUnit, dan jenisAlat wajib diisi'
+            })
+        }
 
         const alat = await prisma.alat.create({
-            data: { 
-                idFms, 
-                noUnit, 
-                jenisAlat, 
-                merk, 
-                kapasitasMuat: parseFloat(kapasitasMuat) || null,
-                kapasitasTangki: parseInt(kapasitasTangki) || null,
-                tahunManufaktur: parseInt(tahunManufaktur) || null,
-                status: status || 'Aktif' 
-            }
+            data: buildAlatPayload(req.body, { useDefaultStatus: true })
         })
-        res.status(201).json({ success: true, data: alat })
+        res.status(201).json({ success: true, data: normalizeAlat(alat) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -52,24 +121,13 @@ exports.createAlat = async (req, res) => {
 
 exports.updateAlat = async (req, res) => {
     try {
-        const { idFms, noUnit, jenisAlat, merk, kapasitasMuat, kapasitasTangki, tahunManufaktur, status } = req.body
-        
-        const updateData = { 
-            idFms, 
-            noUnit, 
-            jenisAlat, 
-            merk, 
-            kapasitasMuat: parseFloat(kapasitasMuat) || null,
-            kapasitasTangki: parseInt(kapasitasTangki) || null,
-            tahunManufaktur: parseInt(tahunManufaktur) || null,
-            status 
-        }
+        const updateData = buildAlatPayload(req.body)
 
         const alat = await prisma.alat.update({
             where: { id: parseInt(req.params.id) },
             data: updateData
         })
-        res.json({ success: true, data: alat })
+        res.json({ success: true, data: normalizeAlat(alat) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -363,7 +421,7 @@ exports.getAllKalibrasi = async (req, res) => {
             include: { alat: true },
             orderBy: { createdAt: 'desc' }
         })
-        res.json({ success: true, data: kalibrasi })
+        res.json({ success: true, data: kalibrasi.map(normalizeKalibrasi) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -378,7 +436,7 @@ exports.getKalibrasiById = async (req, res) => {
         if (!kalibrasi) {
             return res.status(404).json({ success: false, message: 'Kalibrasi tidak ditemukan' })
         }
-        res.json({ success: true, data: kalibrasi })
+        res.json({ success: true, data: normalizeKalibrasi(kalibrasi) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -396,7 +454,7 @@ exports.createKalibrasi = async (req, res) => {
             },
             include: { alat: true }
         })
-        res.status(201).json({ success: true, data: kalibrasi })
+        res.status(201).json({ success: true, data: normalizeKalibrasi(kalibrasi) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }
@@ -415,7 +473,7 @@ exports.updateKalibrasi = async (req, res) => {
             },
             include: { alat: true }
         })
-        res.json({ success: true, data: kalibrasi })
+        res.json({ success: true, data: normalizeKalibrasi(kalibrasi) })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })
     }

@@ -71,9 +71,9 @@ async function lookupAlat(vehicleId) {
     if (alat) {
       return {
         idFms: alat.idFms,
-        noPlat: alat.noPlat || '-',
+        noPlat: alat.noUnit || alat.noPlat || '-',
         jenisAlat: alat.jenisAlat || '-',
-        merekAlat: alat.detailAlat || '-',
+        merekAlat: alat.merk || '-',
       };
     }
   } catch (e) {
