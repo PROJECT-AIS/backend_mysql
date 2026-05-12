@@ -254,8 +254,9 @@ const getHistory = async (req, res) => {
   const stop = to ? to : 'now()';
 
   const { config, queryApi } = getInfluxQueryContext();
-  if (!config.token || !config.org) {
-    return res.status(500).json({ error: 'InfluxDB Org/Token not configured' });
+  if (!config.token || !config.org || !config.bucket) {
+    console.error("InfluxDB Configuration Missing:", config);
+    return res.status(500).json({ error: 'InfluxDB Configuration (Token/Org/Bucket) is missing on server' });
   }
 
   try {
