@@ -1,16 +1,15 @@
 // utils/mqttClient.js
 const mqtt = require('mqtt');
 
-const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt.aispektra.com:443';
+const MQTT_URL = process.env.MQTT_URL || 'wss://mqtt.aispektra.com:443';
 
 const client = mqtt.connect(MQTT_URL, {
   clientId: `express-backend-${Date.now()}`,
+  protocolVersion: 4, // Force MQTT v3.1.1
   keepalive: 60,
   reconnectPeriod: 2000,
   connectTimeout: 30 * 1000, // 30 seconds
   clean: true,
-  // username: process.env.MQTT_USER, // kalau nanti perlu
-  // password: process.env.MQTT_PASS,
 });
 
 let connected = false;

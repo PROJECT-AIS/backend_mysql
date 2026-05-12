@@ -2,10 +2,11 @@
 const prisma = require('../prisma/client');
 const mqtt = require('mqtt');
 
-const MQTT_URL = process.env.MQTT_URL || 'mqtts://mqtt.aispektra.com:443';
+const MQTT_URL = process.env.MQTT_URL || 'wss://mqtt.aispektra.com:443';
 
 // ---------- MQTT client ----------
 const mqttClient = mqtt.connect(MQTT_URL, {
+  protocolVersion: 4, // Force MQTT v3.1.1
   connectTimeout: 30_000,
   reconnectPeriod: 5_000,
   resubscribe: true,
@@ -51,7 +52,7 @@ function parseTsToDate(ts) {
   let t = Number(ts);
   if (!Number.isFinite(t)) return new Date();
   if (t >= 1e12) return new Date(t);       // ms
-  if (t >= 1e9)  return new Date(t * 1000); // s
+  if (t >= 1e9) return new Date(t * 1000); // s
   return new Date(); // fallback
 }
 

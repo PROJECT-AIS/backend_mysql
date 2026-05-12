@@ -88,7 +88,7 @@ const getAll = async (req, res) => {
 
   try {
     // Query: ambil data terakhir per vehicle_id, pivot semua field
-    const flux = `
+      const flux = `
       from(bucket: "${escapeFlux(bucket)}")
         |> range(start: -7d)
         |> filter(fn: (r) => r._measurement == "telemetry")
@@ -97,10 +97,13 @@ const getAll = async (req, res) => {
              or r._field == "spd_kph" or r._field == "heading_deg"
              or r._field == "fuel_vol_l" or r._field == "cons_l_total"
              or r._field == "fuel_anomaly" or r._field == "fuel_in"
-             or r._field == "unit_state_code"
+             or r._field == "unit_state_code" or r._field == "trip_id"
+             or r._field == "status_trip" or r._field == "jenis_muatan"
+             or r._field == "operator_id" or r._field == "operator_name"
         )
         |> group(columns: ["vehicle_id", "_field"])
         |> last()
+        |> map(fn: (r) => ({ r with _value: string(v: r._value) }))
         |> group(columns: ["vehicle_id"])
         |> pivot(rowKey: ["vehicle_id"], columnKey: ["_field"], valueColumn: "_value")
         |> group()
@@ -110,7 +113,7 @@ const getAll = async (req, res) => {
     const rows = await queryApi.collectRows(flux);
 
     // Enrich each row with MySQL data (operator + alat)
-    const data = await Promise.all(
+    const realtimeRows = await Promise.all(
       rows.map(async (r) => {
         const vehicleId = r.vehicle_id || '-';
         const operatorId = r.operator_id || null;
@@ -135,7 +138,7 @@ const getAll = async (req, res) => {
           latitude: r.lat != null ? Number(r.lat).toFixed(6) : '-',
           longitude: r.lon != null ? Number(r.lon).toFixed(6) : '-',
           kecepatan: r.spd_kph != null ? Number(Number(r.spd_kph).toFixed(1)) : 0,
-          jenisMuatan: r.payload_type || '-',
+          jenisMuatan: r.jenis_muatan || r.payload_type || '-',
           volumeFuel: r.fuel_vol_l != null ? Number(Number(r.fuel_vol_l).toFixed(2)) : 0,
           konsumsiFuel: r.cons_l_total != null ? Number(Number(r.cons_l_total).toFixed(2)) : 0,
           anomaliStatusFuel: r.fuel_anomaly
@@ -149,14 +152,61 @@ const getAll = async (req, res) => {
           rentangWaktuPassif: '-',
           durasiPassif: '-',
           mati: stateCode === 0 ? 'YA' : '-',
-          namaOperator: operator.nama,
+          namaOperator: r.operator_name || operator.nama,
           idOperator: operator.id,
-          statusTrip: tripId ? 'TERBUKA' : '-',
+          statusTrip: r.status_trip || (tripId ? 'ON TRIP' : 'END TRIP'),
         };
       })
     );
 
-    res.json({ ok: true, data, source: 'influxdb' });
+    const mysqlRows = await prisma.dataLog.findMany({
+      orderBy: { waktu: 'desc' },
+      take: 200,
+    });
+
+    const historicalRows = mysqlRows.map((row) => ({
+      id: row.id,
+      waktu: row.waktu ? toLocalISO(new Date(row.waktu)) : '-',
+      idAlat: row.idAlat || '-',
+      noPol: row.noPol || '-',
+      jenisAlat: row.jenisAlat || '-',
+      merekAlat: row.merekAlat || '-',
+      trip: row.trip || '-',
+      latitude: row.latitude || '-',
+      longitude: row.longitude || '-',
+      kecepatan: row.kecepatan ?? 0,
+      jenisMuatan: row.jenisMuatan || '-',
+      volumeFuel: row.volumeFuel ?? 0,
+      konsumsiFuel: row.konsumsiFuel ?? 0,
+      anomaliStatusFuel: row.anomaliStatusFuel || 'NORMAL',
+      fuelMasuk: row.fuelMasuk ?? 0,
+      statusAlat: row.statusAlat || 'MATI',
+      start: row.start || '-',
+      rentangWaktuAktif: row.rentangWaktuAktif || '-',
+      durasiAktif: row.durasiAktif || '-',
+      rentangWaktuPassif: row.rentangWaktuPassif || '-',
+      durasiPassif: row.durasiPassif || '-',
+      mati: row.mati || '-',
+      namaOperator: row.namaOperator || '-',
+      idOperator: row.idOperator || '-',
+      statusTrip: row.statusTrip || '-',
+    }));
+
+    const mergeKey = (item) => `${item.idAlat || '-'}|${item.trip || '-'}|${item.waktu || '-'}|${item.statusTrip || '-'}`;
+    const mergedMap = new Map();
+    [...historicalRows, ...realtimeRows].forEach((item) => {
+      mergedMap.set(mergeKey(item), item);
+    });
+
+    const data = Array.from(mergedMap.values()).sort((a, b) => {
+      const ta = Date.parse(a.waktu);
+      const tb = Date.parse(b.waktu);
+      const va = Number.isNaN(ta) ? 0 : ta;
+      const vb = Number.isNaN(tb) ? 0 : tb;
+      return vb - va;
+    });
+
+    res.json({ ok: true, data, source: 'influxdb+mysql' });
   } catch (e) {
     console.error('[DataLog] InfluxDB query error:', e);
     res.status(500).json({ ok: false, error: e.message });
@@ -169,7 +219,7 @@ const getById = async (req, res) => {
   const { queryApi, bucket } = getQueryApi();
 
   try {
-    const flux = `
+      const flux = `
       from(bucket: "${escapeFlux(bucket)}")
         |> range(start: -7d)
         |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${escapeFlux(id)}")
@@ -178,10 +228,13 @@ const getById = async (req, res) => {
              or r._field == "spd_kph" or r._field == "heading_deg"
              or r._field == "fuel_vol_l" or r._field == "cons_l_total"
              or r._field == "fuel_anomaly" or r._field == "fuel_in"
-             or r._field == "unit_state_code"
+             or r._field == "unit_state_code" or r._field == "trip_id"
+             or r._field == "status_trip" or r._field == "jenis_muatan"
+             or r._field == "operator_id" or r._field == "operator_name"
         )
         |> group(columns: ["_field"])
         |> last()
+        |> map(fn: (r) => ({ r with _value: string(v: r._value) }))
         |> group()
         |> pivot(rowKey: ["_time"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: true)
@@ -215,7 +268,7 @@ const getById = async (req, res) => {
       latitude: r.lat != null ? Number(r.lat).toFixed(6) : '-',
       longitude: r.lon != null ? Number(r.lon).toFixed(6) : '-',
       kecepatan: r.spd_kph != null ? Number(Number(r.spd_kph).toFixed(1)) : 0,
-      jenisMuatan: r.payload_type || '-',
+      jenisMuatan: r.jenis_muatan || r.payload_type || '-',
       volumeFuel: r.fuel_vol_l != null ? Number(Number(r.fuel_vol_l).toFixed(2)) : 0,
       konsumsiFuel: r.cons_l_total != null ? Number(Number(r.cons_l_total).toFixed(2)) : 0,
       anomaliStatusFuel: r.fuel_anomaly
@@ -229,9 +282,9 @@ const getById = async (req, res) => {
       rentangWaktuPassif: '-',
       durasiPassif: '-',
       mati: stateCode === 0 ? 'YA' : '-',
-      namaOperator: operator.nama,
+      namaOperator: r.operator_name || operator.nama,
       idOperator: operator.id,
-      statusTrip: tripId ? 'TERBUKA' : '-',
+      statusTrip: r.status_trip || (tripId ? 'ON TRIP' : 'END TRIP'),
     };
 
     res.json({ ok: true, data });
@@ -250,6 +303,7 @@ const create = async (req, res) => {
     if (payload.volumeFuel) payload.volumeFuel = parseFloat(payload.volumeFuel);
     if (payload.konsumsiFuel) payload.konsumsiFuel = parseFloat(payload.konsumsiFuel);
     if (payload.fuelMasuk) payload.fuelMasuk = parseFloat(payload.fuelMasuk);
+    if (!payload.waktu) payload.waktu = new Date();
 
     const newData = await prisma.dataLog.create({
       data: payload,

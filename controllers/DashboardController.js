@@ -43,28 +43,48 @@ const getSummary = async (req, res) => {
   try {
     const flux = `
       from(bucket: "${config.bucket}")
-        |> range(start: -7d)
+        |> range(start: -24h)
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> filter(fn: (r) => r._field == "unit_state_code" or r._field == "cons_l_total")
         |> group(columns: ["vehicle_id", "_field"])
         |> last()
-        |> group(columns: ["_field"])
     `;
 
     const rows = await queryApi.collectRows(flux);
     
+    // Merge fields manually per vehicle because pivot fails on mismatched timestamps
+    const vehicleMap = {};
+    rows.forEach(row => {
+      const vid = row.vehicle_id;
+      if (!vehicleMap[vid]) {
+        vehicleMap[vid] = { vehicle_id: vid, _time: row._time };
+      }
+      vehicleMap[vid][row._field] = row._value;
+      if (new Date(row._time) > new Date(vehicleMap[vid]._time)) {
+        vehicleMap[vid]._time = row._time;
+      }
+    });
+
     let totalDevices = 0;
     let onDevices = 0;
     let offDevices = 0;
     let totalConsumsiBbm = 0;
 
-    rows.forEach(row => {
-      if (row._field === 'unit_state_code') {
-        totalDevices++;
-        const state = Number(row._value);
-        if (state > 0) onDevices++; else offDevices++;
-      } else if (row._field === 'cons_l_total') {
-        totalConsumsiBbm += Number(row._value || 0);
+    const now = Date.now();
+    const TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes tolerance for stability
+
+    Object.values(vehicleMap).forEach(row => {
+      totalDevices++;
+      const state = Number(row.unit_state_code || 0);
+      const lastUpdateTime = row._time ? new Date(row._time).getTime() : 0;
+      const isStale = (now - lastUpdateTime) > TIMEOUT_MS;
+      
+      const isOnline = state > 0 && !isStale;
+      if (isOnline) {
+        onDevices++;
+        totalConsumsiBbm += Number(row.cons_l_total || 0);
+      } else {
+        offDevices++;
       }
     });
 
@@ -131,29 +151,39 @@ const getVehicles = async (req, res) => {
   try {
     const flux = `
       from(bucket: "${config.bucket}")
-        |> range(start: -24h)
+        |> range(start: -15m)
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> group(columns: ["vehicle_id", "_field"])
         |> last()
+        |> map(fn: (r) => ({ r with _value: string(v: r._value) }))
         |> pivot(rowKey:["vehicle_id"], columnKey: ["_field"], valueColumn: "_value")
         |> keep(columns: ["vehicle_id", "device_id", "lat", "lon", "spd_kph", "heading_deg", "fuel_vol_l", "unit_state_code", "_time"])
     `;
 
     const rows = await queryApi.collectRows(flux);
     
-    const vehicles = rows.map(r => ({
-      id: r.vehicle_id,
-      idFms: r.device_id,
-      lat: Number(r.lat),
-      lng: Number(r.lon),
-      speed: Number(r.spd_kph),
-      heading: Number(r.heading_deg),
-      fuelLevel: Number(r.fuel_vol_l),
-      status: Number(r.unit_state_code) > 0 ? 'online' : 'offline',
-      time: toTZISO(new Date(r._time), TZ_OFFSET_MIN),
-      name: r.vehicle_id,
-      plateNumber: r.vehicle_id
-    }));
+    const now = Date.now();
+    const TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
+    const vehicles = rows.map(r => {
+      const lastUpdateTime = r._time ? new Date(r._time).getTime() : 0;
+      const isStale = (now - lastUpdateTime) > TIMEOUT_MS;
+      
+      return {
+        id: r.vehicle_id,
+        idFms: r.device_id,
+        lat: Number(r.lat),
+        lng: Number(r.lon),
+        speed: Number(r.spd_kph),
+        heading: Number(r.heading_deg),
+        fuelLevel: Number(r.fuel_vol_l),
+        // Status is online ONLY if it was recently updated AND has unit_state_code > 0
+        status: (Number(r.unit_state_code) > 0 && !isStale) ? 'online' : 'offline',
+        time: r._time ? toTZISO(new Date(r._time), TZ_OFFSET_MIN) : "-",
+        name: r.vehicle_id,
+        plateNumber: r.vehicle_id
+      };
+    });
 
     res.json(vehicles);
   } catch (err) {
@@ -220,7 +250,7 @@ const getFuelWeekly = async (req, res) => {
 
 const getHistory = async (req, res) => {
   const { vehicle_id, page = 1, limit = 50, from, to } = req.query;
-  const start = from ? from : '-365d';
+  const start = from ? from : '-7d';
   const stop = to ? to : 'now()';
 
   const { config, queryApi } = getInfluxQueryContext();
@@ -237,10 +267,19 @@ const getHistory = async (req, res) => {
     const flux = `
       from(bucket: "${config.bucket}")
         |> range(start: ${start}, stop: ${stop})
-        |> filter(fn: (r) => r._field == "lat" or r._field == "lon" or r._field == "spd_kph" or r._field == "unit_state_code" or r._field == "fuel_vol_l" or r._field == "cons_l_total")
+        |> filter(fn: (r) =>
+          r._field == "lat" or r._field == "lon"
+          or r._field == "spd_kph" or r._field == "unit_state_code"
+          or r._field == "fuel_vol_l" or r._field == "cons_l_total"
+          or r._field == "trip_id" or r._field == "status_trip"
+          or r._field == "lokasi_awal" or r._field == "lokasi_akhir"
+          or r._field == "jenis_muatan" or r._field == "payload_type"
+          or r._field == "operator_id" or r._field == "operator_name"
+        )
         ${filterVehicle}
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: ${limit * 10}) 
+        |> map(fn: (r) => ({ r with _value: string(v: r._value) }))
         |> pivot(rowKey:["_time", "device_id"], columnKey: ["_field"], valueColumn: "_value")
         |> limit(n: ${limit})
     `;
@@ -250,11 +289,12 @@ const getHistory = async (req, res) => {
 
     const formatted = rows.map((r, i) => ({
       seq: (page - 1) * limit + i + 1,
-      waktu: toTZISO(new Date(r._time), TZ_OFFSET_MIN).replace('T', ' ').split('.')[0],
+      waktu: r._time ? toTZISO(new Date(r._time), TZ_OFFSET_MIN).replace('T', ' ').split('.')[0] : "-",
       idAlat: r.device_id || "-",
       unitKendaraan: r.vehicle_id || "-",
       kecepatanKendaraan: Number(r.spd_kph || 0),
-      jenisMuatan: r.payload_type || "-",
+      jenisMuatan: r.jenis_muatan || r.payload_type || "-",
+      statusTrip: r.status_trip || (r.trip_id ? "ON TRIP" : "END TRIP"),
       statusMuatan: r.payload_status || "-",
       statusUnit: {
         start: r.start_time || "-",
@@ -282,8 +322,8 @@ const getHistory = async (req, res) => {
         bahanBakarMasuk: Number(r.fuel_in || 0)
       },
       lokasi: {
-        awal: r.loc_start || "-",
-        akhir: r.loc_end || "-"
+        awal: r.lokasi_awal || r.loc_start || "-",
+        akhir: r.lokasi_akhir || r.loc_end || "-"
       },
       retase: {
         setUlangRetase: r.retase_reset || "-"
@@ -305,16 +345,29 @@ const getHistory = async (req, res) => {
 const getStatistics = async (req, res) => {
   const { period = 'realtime' } = req.query;
   const { config, queryApi } = getInfluxQueryContext();
-  let range = '-24h';
+  let range = '-6h';
   let window = '1h';
 
   if (period === 'today') {
     range = '-24h';
-    window = '12h'; // 2 shifts
+    window = '12h';
   } else if (period === 'week') {
     range = '-7d';
     window = '1d';
   }
+
+  const dayLabels = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+  const toLocalDate = (date) => new Date(date.getTime() + TZ_OFFSET_MIN * 60 * 1000);
+  const getLabelByPeriod = (date) => {
+    const local = toLocalDate(date);
+    if (period === 'week') {
+      return dayLabels[local.getUTCDay()];
+    }
+    if (period === 'today') {
+      return local.getUTCHours() < 12 ? 'Shift 1' : 'Shift 2';
+    }
+    return `${pad(local.getUTCHours())}:00`;
+  };
 
   try {
     const flux = `
@@ -322,25 +375,43 @@ const getStatistics = async (req, res) => {
         |> range(start: ${range})
         |> filter(fn: (r) => r._measurement == "telemetry")
         |> filter(fn: (r) => r._field == "cons_l_total" or r._field == "unit_state_code")
-        |> aggregateWindow(every: ${window}, fn: mean, createEmpty: true)
+        |> group(columns: ["vehicle_id", "_field"])
+        |> aggregateWindow(every: ${window}, fn: last, createEmpty: true)
+        |> fill(usePrevious: true)
+        |> group(columns: ["_time", "vehicle_id"])
+        |> pivot(rowKey:["_time", "vehicle_id"], columnKey: ["_field"], valueColumn: "_value")
     `;
 
     const rows = await queryApi.collectRows(flux);
-    // This is simplified. Real statistics would need more complex aggregation.
-    // For now, let's map what we can.
-    
-    const data = [];
-    const timeMap = {};
+    const bucketMap = new Map();
 
-    rows.forEach(r => {
-      const timeLabel = toTZISO(new Date(r._time), TZ_OFFSET_MIN).split('T')[1].substring(0, 5);
-      if (!timeMap[timeLabel]) {
-        timeMap[timeLabel] = { label: timeLabel, fuel: 0, operating: 0, trip: 0, ob: 0 };
-        data.push(timeMap[timeLabel]);
+    rows.forEach((r) => {
+      const timeValue = r._time ? new Date(r._time) : null;
+      if (!timeValue || Number.isNaN(timeValue.getTime())) return;
+
+      const key = timeValue.toISOString();
+      if (!bucketMap.has(key)) {
+        bucketMap.set(key, {
+          time: key,
+          label: getLabelByPeriod(timeValue),
+          fuel: 0,
+          operating: 0,
+        });
       }
-      if (r._field === 'cons_l_total') timeMap[timeLabel].fuel += Number(r._value || 0);
-      if (r._field === 'unit_state_code' && Number(r._value) > 0) timeMap[timeLabel].operating += 1;
+
+      const bucket = bucketMap.get(key);
+      const state = Number(r.unit_state_code || 0);
+      const fuel = Number(r.cons_l_total || 0);
+
+      if (state > 0) {
+        bucket.operating += 1;
+        bucket.fuel += fuel;
+      }
     });
+
+    const data = Array.from(bucketMap.values()).sort(
+      (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
+    );
 
     res.json(data);
   } catch (err) {

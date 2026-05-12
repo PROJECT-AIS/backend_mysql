@@ -84,7 +84,7 @@ async function latestPayload(req, res) {
 
       num =
         from(bucket: "${influxBucket}")
-          |> range(start: -30d)
+          |> range(start: -24h)
           |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${vehicleId}")
           |> filter(fn: (r) => contains(value: r._field, set: numFields))
           |> map(fn: (r) => ({ r with _value: float(v: r._value) }))
@@ -93,7 +93,7 @@ async function latestPayload(req, res) {
 
       anom =
         from(bucket: "${influxBucket}")
-          |> range(start: -30d)
+          |> range(start: -24h)
           |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${vehicleId}")
           |> filter(fn: (r) => r._field == "fuel_anomaly")
           |> map(fn: (r) => ({
@@ -115,7 +115,7 @@ async function latestPayload(req, res) {
     // 2) Ambil TAG TERBARU (device_id, trip_id, operator_id) — tanpa "now()+30d"
     const fluxTags = `
       from(bucket: "${influxBucket}")
-        |> range(start: -30d)                // cukup start saja (hindari now()+30d)
+        |> range(start: -24h)                // cukup start saja (hindari now()+30d)
         |> filter(fn: (r) => r._measurement == "telemetry" and r.vehicle_id == "${vehicleId}")
         |> keep(columns: ["_time","vehicle_id","device_id","trip_id","operator_id"])
         |> group()

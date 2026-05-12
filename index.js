@@ -11,19 +11,7 @@ const app = express()
 
 // CORS configuration
 app.use(cors({
-    origin: function (origin, callback) {
-        // Allow no origin (like mobile apps or curl) or specific origins
-        if (!origin || [
-            'https://fms.devraffi.my.id',
-            'http://fms.devraffi.my.id',
-            'http://localhost:5173',
-            'http://127.0.0.1:5173'
-        ].indexOf(origin) !== -1 || origin.includes('localhost')) {
-            callback(null, true)
-        } else {
-            callback(new Error('Not allowed by CORS'))
-        }
-    },
+    origin: true, // Allow all origins during development
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     credentials: true,

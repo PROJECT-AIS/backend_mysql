@@ -6,6 +6,7 @@ const path = require('path');
 
 // ✅ FIX: path harus ../utils karena file ini ada di routes/
 const { initCommandBridge } = require('../utils/commandBridge');
+const { initTelemetryBridge } = require('../utils/telemetryBridge');
 
 // Import controllers
 const registerController = require('../controllers/RegisterController');
@@ -37,6 +38,7 @@ const commandQueue = {};
 
 // ✅ FIX: aktifkan command bridge supaya MQTT → queue jalan
 initCommandBridge(commandQueue);
+initTelemetryBridge();
 
 // =======================================================
 // KONFIGURASI MULTER UNTUK UPLOAD FILE
