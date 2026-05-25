@@ -7,6 +7,16 @@ const alatFields = new Set(
     (Prisma?.dmmf?.datamodel?.models?.find((model) => model.name === 'Alat')?.fields || []).map((field) => field.name)
 )
 const alatUnitField = alatFields.has('noUnit') ? 'noUnit' : 'noPlat'
+const EQUIPMENT_STATUS_MAP = {
+    aktif: 'Available',
+    available: 'Available',
+    maintenance: 'Maintenance',
+    'non-aktif': 'Breakdown',
+    'non aktif': 'Breakdown',
+    nonaktif: 'Breakdown',
+    breakdown: 'Breakdown',
+    'break down': 'Breakdown',
+}
 
 const isBlank = (value) => value === undefined || value === null || value === ''
 
@@ -28,6 +38,25 @@ const getAlatUnitValue = (payload = {}) => {
     return null
 }
 
+const normalizeEquipmentStatus = (value) => {
+    if (isBlank(value)) return 'Available'
+    const normalized = String(value).trim().toLowerCase()
+    return EQUIPMENT_STATUS_MAP[normalized] || String(value).trim()
+}
+
+const removeUploadedFile = (filePath) => {
+    if (isBlank(filePath)) return
+
+    try {
+        const uploadFile = path.join(__dirname, '..', 'uploads', path.basename(String(filePath)))
+        if (fs.existsSync(uploadFile)) {
+            fs.unlinkSync(uploadFile)
+        }
+    } catch (error) {
+        console.warn('[ConfigController] Gagal menghapus file upload:', error.message)
+    }
+}
+
 const normalizeAlat = (alat) => {
     if (!alat) return alat
 
@@ -37,6 +66,7 @@ const normalizeAlat = (alat) => {
         ...alat,
         noUnit,
         noPlat: noUnit,
+        status: normalizeEquipmentStatus(alat.status),
     }
 }
 
@@ -49,7 +79,7 @@ const normalizeKalibrasi = (item) => {
     }
 }
 
-const buildAlatPayload = (payload = {}, { useDefaultStatus = false } = {}) => {
+const buildAlatPayload = (payload = {}, { useDefaultStatus = false, imagePath } = {}) => {
     const unitValue = getAlatUnitValue(payload)
     const data = {
         idFms: payload.idFms,
@@ -65,9 +95,13 @@ const buildAlatPayload = (payload = {}, { useDefaultStatus = false } = {}) => {
     }
 
     if (useDefaultStatus) {
-        data.status = payload.status || 'Aktif'
+        data.status = normalizeEquipmentStatus(payload.status || 'Available')
     } else if (payload.status !== undefined) {
-        data.status = payload.status
+        data.status = normalizeEquipmentStatus(payload.status)
+    }
+
+    if (imagePath !== undefined) {
+        data.gambar = imagePath
     }
 
     return data
@@ -102,6 +136,7 @@ exports.getAlatById = async (req, res) => {
 exports.createAlat = async (req, res) => {
     try {
         const unitValue = getAlatUnitValue(req.body)
+        const imagePath = req.file ? `/uploads/${req.file.filename}` : undefined
 
         if (!req.body.idFms || !unitValue || !req.body.jenisAlat) {
             return res.status(400).json({
@@ -111,33 +146,57 @@ exports.createAlat = async (req, res) => {
         }
 
         const alat = await prisma.alat.create({
-            data: buildAlatPayload(req.body, { useDefaultStatus: true })
+            data: buildAlatPayload(req.body, { useDefaultStatus: true, imagePath })
         })
         res.status(201).json({ success: true, data: normalizeAlat(alat) })
     } catch (error) {
+        if (req.file) {
+            removeUploadedFile(`/uploads/${req.file.filename}`)
+        }
         res.status(500).json({ success: false, message: error.message })
     }
 }
 
 exports.updateAlat = async (req, res) => {
     try {
-        const updateData = buildAlatPayload(req.body)
+        const existingAlat = await prisma.alat.findUnique({
+            where: { id: parseInt(req.params.id) }
+        })
+
+        if (!existingAlat) {
+            if (req.file) {
+                removeUploadedFile(`/uploads/${req.file.filename}`)
+            }
+            return res.status(404).json({ success: false, message: 'Alat tidak ditemukan' })
+        }
+
+        const imagePath = req.file ? `/uploads/${req.file.filename}` : undefined
+        const updateData = buildAlatPayload(req.body, { imagePath })
 
         const alat = await prisma.alat.update({
             where: { id: parseInt(req.params.id) },
             data: updateData
         })
+
+        if (req.file && existingAlat.gambar && existingAlat.gambar !== alat.gambar) {
+            removeUploadedFile(existingAlat.gambar)
+        }
+
         res.json({ success: true, data: normalizeAlat(alat) })
     } catch (error) {
+        if (req.file) {
+            removeUploadedFile(`/uploads/${req.file.filename}`)
+        }
         res.status(500).json({ success: false, message: error.message })
     }
 }
 
 exports.deleteAlat = async (req, res) => {
     try {
-        await prisma.alat.delete({
+        const alat = await prisma.alat.delete({
             where: { id: parseInt(req.params.id) }
         })
+        removeUploadedFile(alat.gambar)
         res.json({ success: true, message: 'Alat berhasil dihapus' })
     } catch (error) {
         res.status(500).json({ success: false, message: error.message })

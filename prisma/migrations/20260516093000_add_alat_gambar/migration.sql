@@ -1,0 +1,2 @@
+ALTER TABLE `alat`
+ADD COLUMN `gambar` VARCHAR(500) NULL;

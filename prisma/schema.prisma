@@ -47,6 +47,7 @@ model Alat {
   idFms           String      @unique @map("id_fms") @db.VarChar(50)
   jenisAlat       String      @map("jenis_alat") @db.VarChar(100)
   status          String      @default("Aktif") @db.VarChar(50)
+  gambar          String?     @db.VarChar(500)
   createdAt       DateTime    @default(now()) @map("created_at")
   updatedAt       DateTime    @updatedAt @map("updated_at")
   kapasitasMuat   Float?      @map("kapasitas_muat")
