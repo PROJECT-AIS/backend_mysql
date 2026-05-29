@@ -19,7 +19,10 @@ const toNumberOrNull = (value) => {
     return Number.isFinite(n) ? n : null;
 };
 
-const isNonEmpty = (value) => String(value || '').trim() !== '';
+const isNonEmpty = (value) => {
+    const s = String(value || '').trim();
+    return s !== '' && s !== '-';
+};
 
 const normalizeTripStatus = (value) => {
     const raw = String(value || '').trim().toLowerCase();
@@ -209,6 +212,17 @@ const persistCompletedRetase = async ({
             }),
         ]);
 
+        // Get the very last trip to chain the location
+        const lastTrip = await prisma.dataTrip.findFirst({
+            where: { idAlat: String(vehicleId) },
+            orderBy: { id: 'desc' }
+        });
+
+        let finalLokasiAwal = isNonEmpty(lokasiAwal) ? String(lokasiAwal) : '-';
+        if (lastTrip && isNonEmpty(lastTrip.lokasiFinish) && lastTrip.lokasiFinish !== '-') {
+            finalLokasiAwal = lastTrip.lokasiFinish;
+        }
+
         const tripNumber = existingCount + 1;
         const tripLabel = String(tripNumber);
         const durasi = formatDuration(tripStart, tripEnd);
@@ -219,7 +233,7 @@ const persistCompletedRetase = async ({
                 idAlat: String(vehicleId),
                 trip: tripLabel,
                 tanggal: toLocalDate(tripEnd),
-                lokasiStart: isNonEmpty(lokasiAwal) ? String(lokasiAwal) : '-',
+                lokasiStart: finalLokasiAwal,
                 lokasiFinish: resolvedFinishLocation,
                 namaOperator: operatorInfo.namaOperator,
                 idOperator: operatorInfo.idOperator,
@@ -312,7 +326,7 @@ function initTelemetryBridge() {
                     : String(statusTripRaw || '-').toUpperCase();
 
             const lokasiAwal = data.operator_input?.lokasi_awal ?? data.lokasi_awal ?? data.loc_start;
-            const lokasiAkhir = data.operator_input?.lokasi_akhir ?? data.lokasi_akhir ?? data.loc_end;
+            const lokasiAkhir = data.operator_input?.lokasi_akhir ?? data.lokasi_akhir ?? data.loc_end ?? data.geofence?.name;
             const jenisMuatan = data.operator_input?.jenis_muatan ?? data.jenis_muatan ?? data.payload_type;
 
             let timestamp = new Date();
