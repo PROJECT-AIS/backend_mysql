@@ -219,14 +219,36 @@ const persistCompletedRetase = async ({
         });
 
         let finalLokasiAwal = isNonEmpty(lokasiAwal) ? String(lokasiAwal) : '-';
-        if (lastTrip && isNonEmpty(lastTrip.lokasiFinish) && lastTrip.lokasiFinish !== '-') {
-            finalLokasiAwal = lastTrip.lokasiFinish;
+        // Alur trip berantai dipakai sebagai fallback, bukan override paksa.
+        // Jadi jika lokasi awal trip baru valid dari payload, tetap dipakai.
+        if (!isNonEmpty(finalLokasiAwal) && lastTrip && isNonEmpty(lastTrip.lokasiFinish)) {
+            finalLokasiAwal = String(lastTrip.lokasiFinish);
+        }
+
+        const resolvedFinishLocation = await resolveFinishLocation(lokasiAkhir, lat, lon, fallbackFinishLocation);
+        const durasi = formatDuration(tripStart, tripEnd);
+
+        // Anti-duplikasi: cegah penyimpanan trip identik yang terkirim berulang
+        // dalam rentang waktu berdekatan.
+        if (lastTrip) {
+            const lastFinishMs = new Date(lastTrip.waktuFinish || 0).getTime();
+            const currentFinishMs = new Date(tripEnd).getTime();
+            const sameStart = String(lastTrip.lokasiStart || '-') === String(finalLokasiAwal || '-');
+            const sameFinish = String(lastTrip.lokasiFinish || '-') === String(resolvedFinishLocation || '-');
+            const sameDuration = String(lastTrip.durasi || '-') === String(durasi || '-');
+            const nearInTime =
+                Number.isFinite(lastFinishMs) &&
+                Number.isFinite(currentFinishMs) &&
+                Math.abs(currentFinishMs - lastFinishMs) <= 120000; // 2 menit
+
+            if (sameStart && sameFinish && sameDuration && nearInTime) {
+                console.log(`[TelemetryBridge] Skip duplicate retase for ${vehicleId}`);
+                return;
+            }
         }
 
         const tripNumber = existingCount + 1;
         const tripLabel = String(tripNumber);
-        const durasi = formatDuration(tripStart, tripEnd);
-        const resolvedFinishLocation = await resolveFinishLocation(lokasiAkhir, lat, lon, fallbackFinishLocation);
 
         await prisma.dataTrip.create({
             data: {
@@ -352,6 +374,8 @@ function initTelemetryBridge() {
                 activeTripTag: null,
                 tripLastLokasiAkhir: null,
                 lastLokasiAkhir: null,
+                lastPersistedEndTag: null,
+                lastPersistedEndAt: null,
             };
 
             const nextState = { ...prevState };
@@ -423,7 +447,14 @@ function initTelemetryBridge() {
                 nextState.startOperatorName = null;
                 nextState.activeTripTag = null;
                 nextState.tripLastLokasiAkhir = null;
+                nextState.lastPersistedEndTag = String(data.trip_id ?? prevState.activeTripTag ?? `${tripEnd.getTime()}`);
+                nextState.lastPersistedEndAt = tripEnd.getTime();
             }
+
+            // NONAKTIFKAN fallback persist END TRIP.
+            // Alasan: fallback dapat menyimpan rute lama/stale saat paket END TRIP berulang
+            // atau saat state ON TRIP tidak sinkron, sehingga Info Trip menjadi tidak akurat.
+            // Penyimpanan trip kini hanya dari transisi valid ON TRIP -> END TRIP di atas.
 
             nextState.lastStatus = effectiveTripStatus;
             tripSessionByVehicle.set(vehicleId, nextState);

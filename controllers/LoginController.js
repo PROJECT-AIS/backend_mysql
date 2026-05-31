@@ -16,6 +16,13 @@ const login = async (req, res) => {
     }
 
     try {
+        if (!process.env.JWT_SECRET) {
+            return res.status(500).json({
+                success: false,
+                message: "Server auth is not configured (JWT_SECRET missing)"
+            })
+        }
+
         const user = await prisma.user.findFirst({
             where: {
                 email: req.body.email
@@ -34,6 +41,13 @@ const login = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: "User not found"
+            })
+        }
+
+        if (!user.password) {
+            return res.status(401).json({
+                success: false,
+                message: "Account has no password set"
             })
         }
 
