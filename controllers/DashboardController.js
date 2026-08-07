@@ -106,14 +106,16 @@ const getSummary = async (req, res) => {
     });
 
     dataTrips.forEach(trip => {
-      const type = (trip.jenisMuatan || '').toUpperCase();
+      const type = ((trip.jenisMuatan || '') + ' ' + (trip.lokasiStart || '')).toUpperCase();
+      const finish = (trip.lokasiFinish || '').toUpperCase();
+      
       if (type.includes('OB')) {
         produksiMap['OB - Disposal']++;
       } else if (type.includes('LIM')) {
-        if (type.includes('BARGE')) produksiMap['LIM ORE - Barge']++;
+        if (finish.includes('BARGE') || type.includes('BARGE')) produksiMap['LIM ORE - Barge']++;
         else produksiMap['LIM ORE - Stockpile']++;
       } else if (type.includes('SAP')) {
-        if (type.includes('BARGE')) produksiMap['SAP ORE - Barge']++;
+        if (finish.includes('BARGE') || type.includes('BARGE')) produksiMap['SAP ORE - Barge']++;
         else produksiMap['SAP ORE - Stockpile']++;
       }
     });
@@ -157,7 +159,7 @@ const getVehicles = async (req, res) => {
         |> last()
         |> map(fn: (r) => ({ r with _value: string(v: r._value) }))
         |> pivot(rowKey:["vehicle_id"], columnKey: ["_field"], valueColumn: "_value")
-        |> keep(columns: ["vehicle_id", "device_id", "lat", "lon", "spd_kph", "heading_deg", "fuel_vol_l", "unit_state_code", "_time"])
+        |> keep(columns: ["vehicle_id", "device_id", "lat", "lon", "spd_kph", "heading_deg", "fuel_vol_l", "cons_l_total", "unit_state_code", "operator_id", "operator_name", "lokasi_awal", "lokasi_akhir", "geofence", "_time"])
     `;
 
     const rows = await queryApi.collectRows(flux);
@@ -177,11 +179,17 @@ const getVehicles = async (req, res) => {
         speed: Number(r.spd_kph),
         heading: Number(r.heading_deg),
         fuelLevel: Number(r.fuel_vol_l),
+        fuelConsumption: Number(r.cons_l_total),
         // Status is online ONLY if it was recently updated AND has unit_state_code > 0
         status: (Number(r.unit_state_code) > 0 && !isStale) ? 'online' : 'offline',
         time: r._time ? toTZISO(new Date(r._time), TZ_OFFSET_MIN) : "-",
         name: r.vehicle_id,
-        plateNumber: r.vehicle_id
+        plateNumber: r.vehicle_id,
+        lokasiAwal: r.lokasi_awal || "-",
+        lokasiAkhir: r.lokasi_akhir || "-",
+        geofenceName: r.geofence || "-",
+        operatorId: r.operator_id || "-",
+        operatorName: r.operator_name || "-"
       };
     });
 
@@ -226,21 +234,19 @@ const getFuelWeekly = async (req, res) => {
   try {
     const flux = `
       from(bucket: "${config.bucket}")
-        |> range(start: -7d)
-        |> filter(fn: (r) => r.vehicle_id == "${vehicleId}" and r._field == "fuel_vol_l")
-        |> aggregateWindow(every: 1d, fn: mean, createEmpty: false)
-        |> yield(name: "mean")
+        |> range(start: -24h)
+        |> filter(fn: (r) => r.vehicle_id == "${vehicleId}" and r._field == "cons_l_total")
+        |> aggregateWindow(every: 2h, fn: spread, createEmpty: true)
+        |> fill(value: 0.0)
+        |> sort(columns: ["_time"], desc: true)
+        |> limit(n: 12)
     `;
 
     const rows = await queryApi.collectRows(flux);
-    const days = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
-    const data = rows.map(r => {
-      const d = new Date(r._time);
-      return {
-        day: days[d.getUTCDay()],
-        value: Number(Number(r._value).toFixed(2))
-      };
-    });
+    const data = rows.reverse().map(r => ({
+      time: toTZISO(new Date(r._time), TZ_OFFSET_MIN).split('T')[1].substring(0, 5),
+      value: Number(Number(r._value).toFixed(2))
+    }));
 
     res.json(data);
   } catch (err) {

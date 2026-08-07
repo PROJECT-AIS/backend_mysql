@@ -18,8 +18,8 @@ app.use(cors({
     maxAge: 86400 // Cache preflight for 24 hours
 }))
 
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: '500mb' }))
+app.use(express.urlencoded({ limit: '500mb', extended: true }))
 
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads')

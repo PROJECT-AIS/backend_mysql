@@ -93,6 +93,9 @@ const haversineDistanceMeters = (lat1, lon1, lat2, lon2) => {
     return r * c;
 };
 
+const operatorCache = new Map();
+const OPERATOR_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 const resolveOperator = async (operatorUid, fallbackName = '-') => {
     if (!isNonEmpty(operatorUid)) {
         return {
@@ -101,25 +104,35 @@ const resolveOperator = async (operatorUid, fallbackName = '-') => {
         };
     }
 
+    const now = Date.now();
+    const cached = operatorCache.get(String(operatorUid));
+    if (cached && (now - cached.timestamp < OPERATOR_CACHE_TTL)) {
+        return cached.data;
+    }
+
     try {
         const op = await prisma.operatorNfc.findFirst({
             where: { idCardNfc: String(operatorUid) },
         });
 
         if (op) {
-            return {
+            const data = {
                 idOperator: op.idOperator || String(operatorUid),
                 namaOperator: op.nama || fallbackName || '-',
             };
+            operatorCache.set(String(operatorUid), { data, timestamp: now });
+            return data;
         }
     } catch (error) {
         console.warn('[TelemetryBridge] resolveOperator error:', error.message);
     }
 
-    return {
+    const fallbackData = {
         idOperator: String(operatorUid),
         namaOperator: isNonEmpty(fallbackName) ? fallbackName : '-',
     };
+    operatorCache.set(String(operatorUid), { data: fallbackData, timestamp: now });
+    return fallbackData;
 };
 
 const resolveAlat = async (vehicleId) => {
@@ -284,7 +297,7 @@ const persistCompletedRetase = async ({
                 fuelMasuk: toNumberOrNull(fuelIn),
                 statusAlat: unitStateLabel[Number(unitStateCode)] || 'MATI',
                 start: toIso(tripStart),
-                rentangWaktuAktif: `${toIso(tripStart)} - ${toIso(tripEnd)}`,
+                rentangWaktuAktif: `${toIso(tripStart).slice(0, 19).replace('T', ' ')} - ${toIso(tripEnd).slice(0, 19).replace('T', ' ')}`,
                 durasiAktif: durasi,
                 rentangWaktuPassif: '-',
                 durasiPassif: '-',
@@ -316,7 +329,7 @@ function initTelemetryBridge() {
         }
     });
 
-    client.on('message', (receivedTopic, message) => {
+    client.on('message', async (receivedTopic, message) => {
         const parts = receivedTopic.split('/');
         if (!(parts.length === 3 && parts[0] === 'fms' && parts[2] === 'data')) return;
 
@@ -336,8 +349,12 @@ function initTelemetryBridge() {
             const fuelAnomaly = String(fuelAnomalyRaw) === 'true' || Number(fuelAnomalyRaw) === 1;
             const fuelIn = data.fuel?.in ?? data.fuel_in;
 
-            const operatorUid = data.nfc?.last_uid ?? data.operator_id ?? data.operator?.id;
-            const operatorName = data.operator_name ?? data.operator?.name ?? '-';
+            const rawOperatorUid = data.nfc?.last_uid ?? data.operator_id ?? data.operator?.id;
+            const rawOperatorName = data.operator_name ?? data.operator?.name ?? '-';
+
+            const operatorInfo = await resolveOperator(rawOperatorUid, rawOperatorName);
+            const operatorUid = operatorInfo.idOperator;
+            const operatorName = operatorInfo.namaOperator;
 
             const statusTripRaw = data.operator_input?.status_trip ?? data.status_trip ?? data.payload_status ?? 'End Trip';
             const statusTripNormalized = normalizeTripStatus(statusTripRaw);
@@ -491,6 +508,7 @@ function initTelemetryBridge() {
             addField('status_trip', statusTripLabel);
             addField('lokasi_awal', lokasiAwal);
             addField('lokasi_akhir', lokasiAkhir);
+            addField('geofence', data.geofence?.name);
             addField('jenis_muatan', jenisMuatan);
             addField('payload_type', data.payload_type ?? jenisMuatan);
             addField('payload_status', data.payload_status);
